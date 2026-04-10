@@ -1,0 +1,162 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Outfit:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 240 14% 5%;
+    --foreground: 240 20% 97%;
+
+    --card: 240 14% 9%;
+    --card-foreground: 240 20% 97%;
+
+    --popover: 240 14% 9%;
+    --popover-foreground: 240 20% 97%;
+
+    --primary: 263 70% 50%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 240 14% 12%;
+    --secondary-foreground: 240 20% 97%;
+
+    --muted: 240 14% 12%;
+    --muted-foreground: 245 15% 67%;
+
+    --accent: 240 14% 16%;
+    --accent-foreground: 240 20% 97%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 240 14% 18%;
+    --input: 240 14% 18%;
+    --ring: 263 70% 50%;
+
+    --radius: 0.625rem;
+
+    --sidebar-background: 240 14% 9%;
+    --sidebar-foreground: 245 15% 67%;
+    --sidebar-primary: 263 70% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 14% 16%;
+    --sidebar-accent-foreground: 240 20% 97%;
+    --sidebar-border: 240 14% 18%;
+    --sidebar-ring: 263 70% 50%;
+
+    --bg-primary: 240 14% 5%;
+    --bg-surface: 240 14% 9%;
+    --bg-elevated: 240 14% 12%;
+    --text-primary: 240 20% 97%;
+    --text-muted: 245 15% 67%;
+  }
+
+  .dark {
+    /* Same as root — app is always dark */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+  }
+
+  h1, h2, h3 {
+    @apply font-heading;
+  }
+}
+
+/* TipTap / ProseMirror styles */
+.prose-editor {
+  @apply text-foreground;
+}
+
+.prose-editor h1 {
+  @apply text-2xl font-heading font-bold mt-4 mb-2;
+}
+
+.prose-editor h2 {
+  @apply text-xl font-heading font-semibold mt-3 mb-1.5;
+}
+
+.prose-editor p {
+  @apply mb-2;
+}
+
+.prose-editor ul,
+.prose-editor ol {
+  @apply pl-6 mb-2;
+}
+
+.prose-editor ul {
+  @apply list-disc;
+}
+
+.prose-editor ol {
+  @apply list-decimal;
+}
+
+.prose-editor li {
+  @apply mb-0.5;
+}
+
+.prose-editor p.is-editor-empty:first-child::before {
+  @apply text-muted-foreground;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.ProseMirror:focus {
+  outline: none;
+}
+
+/* Code inline */
+.prose-editor code {
+  @apply bg-accent text-foreground px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+/* Code block */
+.prose-editor pre {
+  background: hsl(240 14% 12%);
+  @apply p-4 rounded-lg mb-2 overflow-x-auto;
+}
+
+.prose-editor pre code {
+  @apply bg-transparent p-0 rounded-none text-sm;
+}
+
+/* Tables */
+.prose-editor table {
+  border-collapse: collapse;
+  @apply w-full mb-2;
+}
+
+.prose-editor th,
+.prose-editor td {
+  border: 1px solid hsl(240 14% 18%);
+  @apply px-3 py-2 text-sm text-left;
+}
+
+.prose-editor th {
+  background: hsl(240 14% 12%);
+  @apply font-semibold;
+}
+
+/* Links */
+.prose-editor a,
+.prose-editor .editor-link {
+  color: hsl(217 91% 60%);
+  @apply cursor-pointer;
+}
+
+.prose-editor a:hover,
+.prose-editor .editor-link:hover {
+  @apply underline;
+}

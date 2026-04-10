@@ -1,0 +1,43 @@
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { fetchEntityLinks, createEntityLink, deleteEntityLink } from "@/lib/api/links";
+import type { EntityType } from "@/types/entities";
+
+export function useEntityLinks(entityId: string, entityType: EntityType) {
+  return useQuery({
+    queryKey: ["entity-links", entityId, entityType],
+    queryFn: () => fetchEntityLinks(entityId, entityType),
+    enabled: !!entityId,
+  });
+}
+
+export function useCreateLink(entityId: string, entityType: EntityType) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (target: { type: EntityType; id: string; label?: string }) =>
+      createEntityLink({
+        source_type: entityType,
+        source_id: entityId,
+        target_type: target.type,
+        target_id: target.id,
+        label: target.label,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entity-links", entityId, entityType] });
+      toast.success("Link criado!");
+    },
+    onError: () => toast.error("Erro ao criar link (já existe?)"),
+  });
+}
+
+export function useDeleteLink(entityId: string, entityType: EntityType) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (linkId: string) => deleteEntityLink(linkId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["entity-links", entityId, entityType] });
+      toast.success("Link removido");
+    },
+    onError: () => toast.error("Erro ao remover link"),
+  });
+}

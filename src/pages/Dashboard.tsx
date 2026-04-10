@@ -1,0 +1,222 @@
+import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { StickyNote, CheckSquare, FolderKanban, AlertTriangle, Clock, Activity } from "lucide-react";
+import { format, isToday, isBefore, startOfDay, addDays } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+
+function getGreeting() {
+  const h = new Date().getHours();
+  if (h < 12) return "Bom dia";
+  if (h < 18) return "Boa tarde";
+  return "Boa noite";
+}
+
+async function fetchDashboardData() {
+  const today = format(new Date(), "yyyy-MM-dd");
+  const threeDaysFromNow = format(addDays(new Date(), 3), "yyyy-MM-dd");
+
+  const [
+    notesCount,
+    tasksCount,
+    projectsCount,
+    recentNotes,
+    overdueTasks,
+    upcomingTasks,
+    activityFeed,
+  ] = await Promise.all([
+    supabase.from("notes").select("id", { count: "exact", head: true }).eq("archived", false),
+    supabase.from("tasks").select("id", { count: "exact", head: true }).eq("archived", false).neq("status", "cancelled"),
+    supabase.from("projects").select("id", { count: "exact", head: true }).eq("archived", false),
+    supabase.from("notes").select("id, title, emoji, color, updated_at").eq("archived", false).order("updated_at", { ascending: false }).limit(5),
+    supabase.from("tasks").select("id, title, due_date, priority, status").eq("archived", false).neq("status", "done").neq("status", "cancelled").lt("due_date", today).not("due_date", "is", null),
+    supabase.from("tasks").select("id, title, due_date, priority, status").eq("archived", false).neq("status", "done").neq("status", "cancelled").gte("due_date", today).lte("due_date", threeDaysFromNow).not("due_date", "is", null).order("due_date", { ascending: true }),
+    supabase.from("tasks").select("id, title, status, updated_at").eq("archived", false).order("updated_at", { ascending: false }).limit(8),
+  ]);
+
+  return {
+    counts: {
+      notes: notesCount.count || 0,
+      tasks: tasksCount.count || 0,
+      projects: projectsCount.count || 0,
+    },
+    recentNotes: recentNotes.data || [],
+    overdueTasks: overdueTasks.data || [],
+    upcomingTasks: upcomingTasks.data || [],
+    activityFeed: activityFeed.data || [],
+  };
+}
+
+const PRIORITY_COLORS: Record<string, string> = {
+  urgent: "#EF4444",
+  high: "#F97316",
+  medium: "#F59E0B",
+  low: "#3B82F6",
+  none: "#6B7280",
+};
+
+export default function Dashboard() {
+  const navigate = useNavigate();
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: fetchDashboardData,
+  });
+
+  if (isLoading) return <p className="text-muted-foreground">Carregando...</p>;
+  if (!data) return null;
+
+  const allDueTasks = [...data.overdueTasks, ...data.upcomingTasks];
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Greeting */}
+      <div>
+        <h1 className="text-2xl font-bold">{getGreeting()} 👋</h1>
+        <p className="text-muted-foreground mt-1">
+          {format(new Date(), "EEEE, d 'de' MMMM", { locale: ptBR })}
+        </p>
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => navigate("/notes")}>
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+              <StickyNote className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{data.counts.notes}</p>
+              <p className="text-xs text-muted-foreground">Notas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => navigate("/tasks")}>
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
+              <CheckSquare className="h-5 w-5 text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{data.counts.tasks}</p>
+              <p className="text-xs text-muted-foreground">Tarefas</p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => navigate("/projects")}>
+          <CardContent className="flex items-center gap-4 p-5">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
+              <FolderKanban className="h-5 w-5 text-emerald-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-bold">{data.counts.projects}</p>
+              <p className="text-xs text-muted-foreground">Projetos</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Overdue + Upcoming Tasks */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-amber-400" />
+              Tarefas urgentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {allDueTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma tarefa urgente 🎉</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {allDueTasks.map((task) => {
+                  const due = new Date(task.due_date + "T00:00:00");
+                  const overdue = isBefore(due, startOfDay(new Date()));
+                  return (
+                    <button
+                      key={task.id}
+                      onClick={() => navigate(`/tasks/${task.id}`)}
+                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                    >
+                      <div
+                        className="h-2 w-2 rounded-full shrink-0"
+                        style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
+                      />
+                      <span className="flex-1 truncate text-foreground">{task.title}</span>
+                      <Badge variant={overdue ? "destructive" : "secondary"} className="text-xs">
+                        {overdue ? "Atrasada" : isToday(due) ? "Hoje" : format(due, "dd/MM")}
+                      </Badge>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Notes */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Clock className="h-4 w-4 text-muted-foreground" />
+              Notas recentes
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {data.recentNotes.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhuma nota ainda</p>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {data.recentNotes.map((note) => (
+                  <button
+                    key={note.id}
+                    onClick={() => navigate(`/notes/${note.id}`)}
+                    className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                  >
+                    <div className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: note.color || "#7C3AED" }} />
+                    <span className="flex-1 truncate text-foreground">
+                      {note.emoji && `${note.emoji} `}{note.title}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(note.updated_at), "dd/MM")}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Activity Feed */}
+        <Card className="lg:col-span-2">
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4 text-muted-foreground" />
+              Atividade recente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-2">
+              {data.activityFeed.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => navigate(`/tasks/${item.id}`)}
+                  className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                >
+                  <CheckSquare className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                  <span className="flex-1 truncate text-foreground">{item.title}</span>
+                  <Badge variant="secondary" className="text-xs capitalize">{item.status.replace("_", " ")}</Badge>
+                  <span className="text-xs text-muted-foreground">
+                    {format(new Date(item.updated_at), "dd/MM HH:mm")}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
