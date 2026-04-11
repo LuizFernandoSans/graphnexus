@@ -37,6 +37,7 @@ export interface Task {
   recurrence_rule: string | null;
   recurrence_end_date: string | null;
   recurrence_parent_id: string | null;
+  recurrence_days: number[] | null;
   created_at: string;
   updated_at: string;
 }

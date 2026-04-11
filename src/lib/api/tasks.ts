@@ -57,6 +57,7 @@ export async function createTask(task: {
   recurrence_rule?: string | null;
   recurrence_end_date?: string | null;
   recurrence_parent_id?: string | null;
+  recurrence_days?: number[] | null;
 }) {
   const { data, error } = await supabase
     .from("tasks")
@@ -71,6 +72,7 @@ export async function createTask(task: {
       recurrence_rule: task.recurrence_rule || null,
       recurrence_end_date: task.recurrence_end_date || null,
       recurrence_parent_id: task.recurrence_parent_id || null,
+      recurrence_days: task.recurrence_days || null,
     })
     .select()
     .single();
@@ -94,6 +96,7 @@ export async function updateTask(
   if (updates.archived !== undefined) payload.archived = updates.archived as boolean;
   if (updates.recurrence_rule !== undefined) payload.recurrence_rule = updates.recurrence_rule as string | null;
   if (updates.recurrence_end_date !== undefined) payload.recurrence_end_date = updates.recurrence_end_date as string | null;
+  if (updates.recurrence_days !== undefined) (payload as Record<string, unknown>).recurrence_days = updates.recurrence_days;
 
   const { data, error } = await supabase
     .from("tasks")
