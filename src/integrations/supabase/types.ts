@@ -144,6 +144,7 @@ export type Database = {
           estimated_minutes: number | null
           id: string
           priority: string
+          recurrence_days: number[] | null
           recurrence_end_date: string | null
           recurrence_parent_id: string | null
           recurrence_rule: string | null
@@ -162,6 +163,7 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           priority?: string
+          recurrence_days?: number[] | null
           recurrence_end_date?: string | null
           recurrence_parent_id?: string | null
           recurrence_rule?: string | null
@@ -180,6 +182,7 @@ export type Database = {
           estimated_minutes?: number | null
           id?: string
           priority?: string
+          recurrence_days?: number[] | null
           recurrence_end_date?: string | null
           recurrence_parent_id?: string | null
           recurrence_rule?: string | null
