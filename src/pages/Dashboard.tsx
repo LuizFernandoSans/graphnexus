@@ -1,11 +1,20 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { StickyNote, CheckSquare, FolderKanban, AlertTriangle, Clock, Activity } from "lucide-react";
+import { StickyNote, CheckSquare, FolderKanban, AlertTriangle, Clock, Activity, Settings, Sparkles } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { WeeklyReview } from "@/components/WeeklyReview";
+
+const DAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
 function getGreeting() {
   const h = new Date().getHours();
@@ -59,6 +68,10 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const [reviewDay, setReviewDay] = useLocalStorage("nexus_review_day", 5);
+  const [reviewOpen, setReviewOpen] = useState(false);
+
+  const isReviewDay = new Date().getDay() === reviewDay;
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
@@ -72,6 +85,59 @@ export default function Dashboard() {
 
   return (
     <div className="flex flex-col gap-6">
+      {/* Review Banner */}
+      {isReviewDay && (
+        <div className="relative rounded-xl p-4 md:p-6 bg-gradient-to-r from-[hsl(var(--card))] to-[hsl(var(--background))] border border-border">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <span className="text-sm font-medium text-primary">Revisão Semanal</span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {getGreeting()}! Hoje é o dia da sua Revisão Semanal. Que tal tirar 5 minutos para limpar a mente?
+              </p>
+            </div>
+            <Button
+              onClick={() => setReviewOpen(true)}
+              className="min-h-[48px] w-full sm:w-auto text-base"
+            >
+              Iniciar Revisão
+            </Button>
+          </div>
+
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-2 right-2 h-7 w-7 text-muted-foreground hover:text-foreground"
+              >
+                <Settings className="h-3.5 w-3.5" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56" align="end">
+              <Label className="text-xs text-muted-foreground mb-2 block">Dia da revisão</Label>
+              <Select
+                value={String(reviewDay)}
+                onValueChange={(v) => setReviewDay(Number(v))}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DAY_NAMES.map((name, i) => (
+                    <SelectItem key={i} value={String(i)}>
+                      {name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </PopoverContent>
+          </Popover>
+        </div>
+      )}
+
       {/* Greeting */}
       <div>
         <h1 className="text-2xl font-bold">{getGreeting()} 👋</h1>
@@ -95,8 +161,8 @@ export default function Dashboard() {
         </Card>
         <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => navigate("/tasks")}>
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/20">
-              <CheckSquare className="h-5 w-5 text-blue-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+              <CheckSquare className="h-5 w-5 text-primary" />
             </div>
             <div>
               <p className="text-2xl font-bold">{data.counts.tasks}</p>
@@ -106,8 +172,8 @@ export default function Dashboard() {
         </Card>
         <Card className="cursor-pointer hover:bg-accent transition-colors" onClick={() => navigate("/projects")}>
           <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20">
-              <FolderKanban className="h-5 w-5 text-emerald-400" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/20">
+              <FolderKanban className="h-5 w-5 text-primary" />
             </div>
             <div>
               <p className="text-2xl font-bold">{data.counts.projects}</p>
@@ -217,6 +283,9 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Weekly Review Modal */}
+      <WeeklyReview open={reviewOpen} onOpenChange={setReviewOpen} />
     </div>
   );
 }
