@@ -1,11 +1,11 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate, useBlocker } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, Trash2, Check, Archive } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Check, Archive, SkipForward } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fetchTask, updateTask, deleteTask } from "@/lib/api/tasks";
-import { useCompleteRecurringTask } from "@/hooks/useRecurrence";
+import { useCompleteRecurringTask, useSkipRecurringTask } from "@/hooks/useRecurrence";
 import { RecurrenceSelector } from "@/components/RecurrenceSelector";
 import { LinkPanel } from "@/components/LinkPanel";
 import { Button } from "@/components/ui/button";
@@ -57,6 +57,7 @@ export default function TaskDetail() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const completeRecurring = useCompleteRecurringTask();
+  const skipRecurring = useSkipRecurringTask();
 
   const { data: task, isLoading } = useQuery({
     queryKey: ["task", id],
@@ -70,6 +71,7 @@ export default function TaskDetail() {
   const [priority, setPriority] = useState<TaskPriority>("none");
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [recurrenceRule, setRecurrenceRule] = useState<string | null>(null);
+  const [recurrenceDays, setRecurrenceDays] = useState<number[] | null>(null);
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loaded, setLoaded] = useState(false);
@@ -83,6 +85,7 @@ export default function TaskDetail() {
       setPriority(task.priority);
       setDueDate(task.due_date ? new Date(task.due_date + "T00:00:00") : undefined);
       setRecurrenceRule(task.recurrence_rule);
+      setRecurrenceDays(task.recurrence_days);
       setEstimatedMinutes(task.estimated_minutes?.toString() || "");
       setLoaded(true);
     }
@@ -99,6 +102,7 @@ export default function TaskDetail() {
         priority,
         due_date: dueDate ? format(dueDate, "yyyy-MM-dd") : null,
         recurrence_rule: recurrenceRule,
+        recurrence_days: recurrenceDays,
         estimated_minutes: estimatedMinutes ? parseInt(estimatedMinutes, 10) : null,
       }),
     onSuccess: () => {
@@ -161,6 +165,16 @@ export default function TaskDetail() {
               onClick={() => completeRecurring.mutate(task)}
             >
               <Check className="mr-1 h-4 w-4" /> Concluir
+            </Button>
+          )}
+          {task.recurrence_rule && task.status !== "done" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => skipRecurring.mutate(task)}
+              disabled={skipRecurring.isPending}
+            >
+              <SkipForward className="mr-1 h-4 w-4" /> Pular
             </Button>
           )}
           <Button
@@ -263,6 +277,8 @@ export default function TaskDetail() {
         <RecurrenceSelector
           value={recurrenceRule}
           onChange={(v) => { setRecurrenceRule(v); markChanged(); }}
+          recurrenceDays={recurrenceDays}
+          onRecurrenceDaysChange={(d) => { setRecurrenceDays(d); markChanged(); }}
         />
       </div>
 

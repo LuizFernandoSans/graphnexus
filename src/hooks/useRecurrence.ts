@@ -4,24 +4,33 @@ import { toast } from "sonner";
 import { updateTask, createTask } from "@/lib/api/tasks";
 import type { Task } from "@/types/entities";
 
-function parseRecurrenceRule(rule: string): { unit: "day" | "week" | "month"; interval: number } | null {
-  // Format: "every:<interval>:<unit>" e.g. "every:1:week", "every:3:day"
+function parseRecurrenceRule(rule: string): { unit: "day" | "week" | "month" | "custom_days"; interval: number } | null {
   const parts = rule.split(":");
   if (parts.length !== 3 || parts[0] !== "every") return null;
   const interval = parseInt(parts[1], 10);
-  const unit = parts[2] as "day" | "week" | "month";
-  if (isNaN(interval) || !["day", "week", "month"].includes(unit)) return null;
+  const unit = parts[2] as "day" | "week" | "month" | "custom_days";
+  if (isNaN(interval) || !["day", "week", "month", "custom_days"].includes(unit)) return null;
   return { unit, interval };
 }
 
-function computeNextDate(baseDate: string | null, rule: string): string | null {
+function computeNextDate(baseDate: string | null, rule: string, recurrenceDays?: number[] | null): string | null {
   const parsed = parseRecurrenceRule(rule);
   if (!parsed) return null;
 
   const today = startOfDay(new Date());
   const base = baseDate ? startOfDay(new Date(baseDate)) : today;
-  // If the task is overdue, use today as base
   const effectiveBase = isAfter(today, base) ? today : base;
+
+  if (parsed.unit === "custom_days" && recurrenceDays && recurrenceDays.length > 0) {
+    let candidate = addDays(effectiveBase, 1);
+    for (let i = 0; i < 7; i++) {
+      if (recurrenceDays.includes(candidate.getDay())) {
+        return candidate.toISOString().split("T")[0];
+      }
+      candidate = addDays(candidate, 1);
+    }
+    return null;
+  }
 
   let next: Date;
   switch (parsed.unit) {
@@ -34,6 +43,8 @@ function computeNextDate(baseDate: string | null, rule: string): string | null {
     case "month":
       next = addMonths(effectiveBase, parsed.interval);
       break;
+    default:
+      return null;
   }
 
   return next.toISOString().split("T")[0];
@@ -44,17 +55,14 @@ export function useCompleteRecurringTask() {
 
   return useMutation({
     mutationFn: async (task: Task) => {
-      // Mark current task as done
       await updateTask(task.id, {
         status: "done",
         completed_at: new Date().toISOString(),
       });
 
-      // If recurring, create next occurrence
       if (task.recurrence_rule) {
-        const nextDue = computeNextDate(task.due_date, task.recurrence_rule);
+        const nextDue = computeNextDate(task.due_date, task.recurrence_rule, task.recurrence_days);
 
-        // Check if past recurrence_end_date
         if (task.recurrence_end_date && nextDue) {
           const end = new Date(task.recurrence_end_date);
           const next = new Date(nextDue);
@@ -74,6 +82,7 @@ export function useCompleteRecurringTask() {
           recurrence_rule: task.recurrence_rule,
           recurrence_end_date: task.recurrence_end_date,
           recurrence_parent_id: task.recurrence_parent_id || task.id,
+          recurrence_days: task.recurrence_days,
         });
 
         toast.success("Tarefa concluída — próxima ocorrência criada");
@@ -86,6 +95,38 @@ export function useCompleteRecurringTask() {
     },
     onError: () => {
       toast.error("Erro ao completar tarefa");
+    },
+  });
+}
+
+export function useSkipRecurringTask() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (task: Task) => {
+      if (!task.recurrence_rule) throw new Error("Tarefa não é recorrente");
+
+      const nextDue = computeNextDate(task.due_date, task.recurrence_rule, task.recurrence_days);
+      if (!nextDue) throw new Error("Não foi possível calcular a próxima data");
+
+      if (task.recurrence_end_date) {
+        const end = new Date(task.recurrence_end_date);
+        const next = new Date(nextDue);
+        if (isAfter(next, end)) {
+          toast.info("Recorrência encerrada — não há mais datas");
+          return;
+        }
+      }
+
+      await updateTask(task.id, { due_date: nextDue });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task"] });
+      toast.success("Ocorrência pulada para a próxima data");
+    },
+    onError: () => {
+      toast.error("Erro ao pular ocorrência");
     },
   });
 }
