@@ -3,12 +3,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus, Search, Archive, Pin } from "lucide-react";
 import { toast } from "sonner";
-import { fetchNotes, createNote, getAllNoteTags } from "@/lib/api/notes";
+import { fetchNotes, createNote, updateNote, getAllNoteTags } from "@/lib/api/notes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { SwipeableItem } from "@/components/ui/SwipeableItem";
 import {
   Dialog,
   DialogContent,
@@ -153,7 +154,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col rounded-lg border border-border p-4 text-left transition-colors hover:bg-accent"
+      className="group flex flex-col rounded-lg border border-border p-4 text-left transition-colors hover:bg-accent w-full"
       style={{
         backgroundColor: `${note.color}26`,
         borderLeftWidth: 4,
@@ -197,6 +198,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
 
 export default function Notes() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showArchived, setShowArchived] = useState(false);
@@ -209,6 +211,23 @@ export default function Notes() {
   const { data: allTags = [] } = useQuery({
     queryKey: ["note-tags"],
     queryFn: getAllNoteTags,
+  });
+
+  const pinMutation = useMutation({
+    mutationFn: ({ id, pinned }: { id: string; pinned: boolean }) =>
+      updateNote(id, { pinned: !pinned }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      toast.success("Nota atualizada");
+    },
+  });
+
+  const archiveMutation = useMutation({
+    mutationFn: (id: string) => updateNote(id, { archived: true }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      toast.success("Nota arquivada");
+    },
   });
 
   const toggleTag = (tag: string) => {
@@ -273,11 +292,20 @@ export default function Notes() {
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {notes.map((note) => (
-            <NoteCard
+            <SwipeableItem
               key={note.id}
-              note={note}
-              onClick={() => navigate(`/notes/${note.id}`)}
-            />
+              onSwipeRight={() => pinMutation.mutate({ id: note.id, pinned: note.pinned })}
+              onSwipeLeft={() => archiveMutation.mutate(note.id)}
+              rightIcon={Pin}
+              leftIcon={Archive}
+              rightBgColor="bg-primary"
+              leftBgColor="bg-destructive"
+            >
+              <NoteCard
+                note={note}
+                onClick={() => navigate(`/notes/${note.id}`)}
+              />
+            </SwipeableItem>
           ))}
         </div>
       )}

@@ -64,6 +64,8 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-top: env(safe-area-inset-top);
   }
 
   h1, h2, h3 {

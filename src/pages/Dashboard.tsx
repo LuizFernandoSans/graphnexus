@@ -1,18 +1,23 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import { StickyNote, CheckSquare, FolderKanban, AlertTriangle, Clock, Activity, Settings, Sparkles } from "lucide-react";
+import { StickyNote, CheckSquare, FolderKanban, AlertTriangle, Clock, Activity, Settings, Sparkles, Check } from "lucide-react";
 import { format, isToday, isBefore, startOfDay, addDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { updateTask } from "@/lib/api/tasks";
+import { useCompleteRecurringTask } from "@/hooks/useRecurrence";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { SwipeableItem } from "@/components/ui/SwipeableItem";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { WeeklyReview } from "@/components/WeeklyReview";
+import { Clock as ClockIcon } from "lucide-react";
 
 const DAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -40,8 +45,8 @@ async function fetchDashboardData() {
     supabase.from("tasks").select("id", { count: "exact", head: true }).eq("archived", false).neq("status", "cancelled"),
     supabase.from("projects").select("id", { count: "exact", head: true }).eq("archived", false),
     supabase.from("notes").select("id, title, emoji, color, updated_at").eq("archived", false).order("updated_at", { ascending: false }).limit(5),
-    supabase.from("tasks").select("id, title, due_date, priority, status").eq("archived", false).neq("status", "done").neq("status", "cancelled").lt("due_date", today).not("due_date", "is", null),
-    supabase.from("tasks").select("id, title, due_date, priority, status").eq("archived", false).neq("status", "done").neq("status", "cancelled").gte("due_date", today).lte("due_date", threeDaysFromNow).not("due_date", "is", null).order("due_date", { ascending: true }),
+    supabase.from("tasks").select("id, title, due_date, priority, status, recurrence_rule, recurrence_days").eq("archived", false).neq("status", "done").neq("status", "cancelled").lt("due_date", today).not("due_date", "is", null),
+    supabase.from("tasks").select("id, title, due_date, priority, status, recurrence_rule, recurrence_days").eq("archived", false).neq("status", "done").neq("status", "cancelled").gte("due_date", today).lte("due_date", threeDaysFromNow).not("due_date", "is", null).order("due_date", { ascending: true }),
     supabase.from("tasks").select("id, title, status, updated_at").eq("archived", false).order("updated_at", { ascending: false }).limit(8),
   ]);
 
@@ -68,14 +73,28 @@ const PRIORITY_COLORS: Record<string, string> = {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [reviewDay, setReviewDay] = useLocalStorage("nexus_review_day", 5);
   const [reviewOpen, setReviewOpen] = useState(false);
+  const completeRecurring = useCompleteRecurringTask();
 
   const isReviewDay = new Date().getDay() === reviewDay;
 
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboardData,
+  });
+
+  const postponeMutation = useMutation({
+    mutationFn: async ({ id, dueDate }: { id: string; dueDate: string }) => {
+      const newDate = format(addDays(new Date(dueDate + "T00:00:00"), 1), "yyyy-MM-dd");
+      return updateTask(id, { due_date: newDate });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Tarefa adiada para amanhã");
+    },
   });
 
   if (isLoading) return <p className="text-muted-foreground">Carregando...</p>;
@@ -201,20 +220,36 @@ export default function Dashboard() {
                   const due = new Date(task.due_date + "T00:00:00");
                   const overdue = isBefore(due, startOfDay(new Date()));
                   return (
-                    <button
+                    <SwipeableItem
                       key={task.id}
-                      onClick={() => navigate(`/tasks/${task.id}`)}
-                      className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent transition-colors"
+                      onSwipeRight={() =>
+                        completeRecurring.mutate(task as any)
+                      }
+                      onSwipeLeft={() =>
+                        postponeMutation.mutate({
+                          id: task.id,
+                          dueDate: task.due_date,
+                        })
+                      }
+                      rightIcon={Check}
+                      leftIcon={ClockIcon}
+                      rightBgColor="bg-green-600"
+                      leftBgColor="bg-amber-600"
                     >
-                      <div
-                        className="h-2 w-2 rounded-full shrink-0"
-                        style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
-                      />
-                      <span className="flex-1 truncate text-foreground">{task.title}</span>
-                      <Badge variant={overdue ? "destructive" : "secondary"} className="text-xs">
-                        {overdue ? "Atrasada" : isToday(due) ? "Hoje" : format(due, "dd/MM")}
-                      </Badge>
-                    </button>
+                      <button
+                        onClick={() => navigate(`/tasks/${task.id}`)}
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-accent transition-colors w-full min-h-[44px]"
+                      >
+                        <div
+                          className="h-2 w-2 rounded-full shrink-0"
+                          style={{ backgroundColor: PRIORITY_COLORS[task.priority] }}
+                        />
+                        <span className="flex-1 truncate text-foreground">{task.title}</span>
+                        <Badge variant={overdue ? "destructive" : "secondary"} className="text-xs">
+                          {overdue ? "Atrasada" : isToday(due) ? "Hoje" : format(due, "dd/MM")}
+                        </Badge>
+                      </button>
+                    </SwipeableItem>
                   );
                 })}
               </div>
