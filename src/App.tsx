@@ -1,4 +1,6 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { get, set, del } from "idb-keyval";
 import {
   createBrowserRouter,
   RouterProvider,
@@ -9,6 +11,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppLayout } from "@/components/AppLayout";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import Dashboard from "@/pages/Dashboard";
 import Notes from "@/pages/Notes";
 import NoteDetail from "@/pages/NoteDetail";
@@ -22,7 +25,33 @@ import Login from "@/pages/Login";
 import Signup from "@/pages/Signup";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 1000 * 60 * 60 * 24 * 7, // 7 days
+      staleTime: 1000 * 60 * 5, // 5 min
+      retry: (failureCount, error) => {
+        // Don't retry when offline
+        if (!navigator.onLine) return false;
+        return failureCount < 3;
+      },
+    },
+  },
+});
+
+const IDB_KEY = "nexus_cache";
+
+const persister = {
+  persistClient: async (client: unknown) => {
+    await set(IDB_KEY, client);
+  },
+  restoreClient: async () => {
+    return await get(IDB_KEY);
+  },
+  removeClient: async () => {
+    await del(IDB_KEY);
+  },
+};
 
 const router = createBrowserRouter([
   { path: "/login", element: <Login /> },
@@ -50,15 +79,16 @@ const router = createBrowserRouter([
 ]);
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: 1000 * 60 * 60 * 24 * 7 }}>
     <TooltipProvider>
       <AuthProvider>
         <Toaster />
         <Sonner />
+        <OfflineBanner />
         <RouterProvider router={router} />
       </AuthProvider>
     </TooltipProvider>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;
