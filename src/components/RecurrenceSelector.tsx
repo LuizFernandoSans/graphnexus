@@ -1,4 +1,3 @@
-import { useState } from "react";
 import {
   Select,
   SelectContent,
@@ -12,24 +11,34 @@ import { Toggle } from "@/components/ui/toggle";
 
 const DAY_LABELS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
+type RecurrenceUnit = "day" | "week" | "month" | "custom_days";
+
+function parseRule(rule: string | null): { interval: string; unit: RecurrenceUnit } {
+  if (!rule) return { interval: "1", unit: "week" };
+  const parts = rule.split(":");
+  return { interval: parts[1] || "1", unit: (parts[2] as RecurrenceUnit) || "week" };
+}
+
 interface RecurrenceSelectorProps {
   value: string | null;
   onChange: (rule: string | null) => void;
-  recurrenceDays?: number[] | null;
-  onRecurrenceDaysChange?: (days: number[] | null) => void;
+  recurrenceDays: number[] | null;
+  onRecurrenceDaysChange: (days: number[] | null) => void;
 }
 
-export function RecurrenceSelector({ value, onChange, recurrenceDays, onRecurrenceDaysChange }: RecurrenceSelectorProps) {
-  const parsed = value ? value.split(":") : null;
-  const [interval, setInterval] = useState(parsed ? parsed[1] : "1");
-  const [unit, setUnit] = useState(parsed ? parsed[2] : "week");
-  const [enabled, setEnabled] = useState(!!value);
-  const [selectedDays, setSelectedDays] = useState<number[]>(recurrenceDays || []);
+export function RecurrenceSelector({
+  value,
+  onChange,
+  recurrenceDays,
+  onRecurrenceDaysChange,
+}: RecurrenceSelectorProps) {
+  const enabled = !!value;
+  const { interval, unit } = parseRule(value);
 
   const emit = (i: string, u: string, e: boolean) => {
     if (!e) {
       onChange(null);
-      onRecurrenceDaysChange?.(null);
+      onRecurrenceDaysChange(null);
       return;
     }
     if (u === "custom_days") {
@@ -39,15 +48,15 @@ export function RecurrenceSelector({ value, onChange, recurrenceDays, onRecurren
     const num = parseInt(i, 10);
     if (isNaN(num) || num <= 0) return;
     onChange(`every:${num}:${u}`);
-    onRecurrenceDaysChange?.(null);
+    onRecurrenceDaysChange(null);
   };
 
   const toggleDay = (day: number) => {
-    const next = selectedDays.includes(day)
-      ? selectedDays.filter((d) => d !== day)
-      : [...selectedDays, day].sort();
-    setSelectedDays(next);
-    onRecurrenceDaysChange?.(next.length > 0 ? next : null);
+    const current = recurrenceDays || [];
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : [...current, day].sort();
+    onRecurrenceDaysChange(next.length > 0 ? next : null);
   };
 
   return (
@@ -57,11 +66,12 @@ export function RecurrenceSelector({ value, onChange, recurrenceDays, onRecurren
           type="checkbox"
           checked={enabled}
           onChange={(e) => {
-            setEnabled(e.target.checked);
             if (!e.target.checked) {
-              setSelectedDays([]);
+              onChange(null);
+              onRecurrenceDaysChange(null);
+            } else {
+              emit(interval, unit, true);
             }
-            emit(interval, unit, e.target.checked);
           }}
           className="rounded border-border"
         />
@@ -77,19 +87,13 @@ export function RecurrenceSelector({ value, onChange, recurrenceDays, onRecurren
                 type="number"
                 min={1}
                 value={interval}
-                onChange={(e) => {
-                  setInterval(e.target.value);
-                  emit(e.target.value, unit, true);
-                }}
+                onChange={(e) => emit(e.target.value, unit, true)}
                 className="w-16"
               />
             )}
             <Select
               value={unit}
-              onValueChange={(v) => {
-                setUnit(v);
-                emit(interval, v, true);
-              }}
+              onValueChange={(v) => emit(interval, v, true)}
             >
               <SelectTrigger className="w-36">
                 <SelectValue />
@@ -108,7 +112,7 @@ export function RecurrenceSelector({ value, onChange, recurrenceDays, onRecurren
               {DAY_LABELS.map((label, idx) => (
                 <Toggle
                   key={idx}
-                  pressed={selectedDays.includes(idx)}
+                  pressed={recurrenceDays?.includes(idx) ?? false}
                   onPressedChange={() => toggleDay(idx)}
                   className="h-9 w-9 rounded-full text-xs font-medium p-0"
                   aria-label={label}
