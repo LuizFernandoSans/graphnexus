@@ -20,7 +20,7 @@ export function AppLayout() {
       </div>
 
       {/* Mobile top bar */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex md:hidden items-center h-[60px] px-4 gap-3 border-b border-border bg-[hsl(var(--sidebar-background))]">
+      <div className="fixed top-0 left-0 right-0 z-40 flex md:hidden items-center h-[60px] px-4 gap-3 border-b border-border/50 bg-[hsl(var(--sidebar-background)/.8)] backdrop-blur-lg">
         <button
           onClick={() => setMobileOpen(true)}
           className="rounded p-2 text-foreground hover:bg-accent"

@@ -18,6 +18,7 @@ import { SwipeableItem } from "@/components/ui/SwipeableItem";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
 import { WeeklyReview } from "@/components/WeeklyReview";
 import { Clock as ClockIcon } from "lucide-react";
+import { PageTransition } from "@/components/PageTransition";
 
 const DAY_NAMES = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
 
@@ -103,6 +104,7 @@ export default function Dashboard() {
   const allDueTasks = [...data.overdueTasks, ...data.upcomingTasks];
 
   return (
+    <PageTransition>
     <div className="flex flex-col gap-6">
       {/* Review Banner */}
       {isReviewDay && (
@@ -322,5 +324,6 @@ export default function Dashboard() {
       {/* Weekly Review Modal */}
       <WeeklyReview open={reviewOpen} onOpenChange={setReviewOpen} />
     </div>
+    </PageTransition>
   );
 }

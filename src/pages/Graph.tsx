@@ -1,5 +1,6 @@
 import { lazy, Suspense, useRef, useCallback, useEffect, useState, useMemo } from "react";
 import { EyeOff, Eye } from "lucide-react";
+import { PageTransition } from "@/components/PageTransition";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { forceRadial } from "d3-force";
@@ -169,6 +170,7 @@ export default function Graph() {
   if (isLoading) return <p className="text-muted-foreground">Carregando grafo...</p>;
 
   return (
+    <PageTransition>
     <div ref={containerRef} className="relative w-full h-[calc(100vh-5rem)] rounded-lg overflow-hidden border border-border">
       {/* Orphan counter overlay */}
       {data && (
@@ -214,5 +216,6 @@ export default function Graph() {
         )}
       </Suspense>
     </div>
+    </PageTransition>
   );
 }

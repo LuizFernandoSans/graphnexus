@@ -49,7 +49,7 @@ export function QuickAdd() {
     <div className="fixed bottom-6 right-6 z-[60]">
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button size="icon" className="h-14 w-14 rounded-full shadow-lg">
+          <Button size="icon" className="h-14 w-14 rounded-full shadow-lg transition-all duration-200 active:scale-[0.97]">
             <Plus className="h-5 w-5" />
           </Button>
         </DropdownMenuTrigger>

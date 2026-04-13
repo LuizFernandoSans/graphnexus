@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { SwipeableItem } from "@/components/ui/SwipeableItem";
+import { PageTransition } from "@/components/PageTransition";
 import {
   Dialog,
   DialogContent,
@@ -154,7 +155,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col rounded-lg border border-border p-4 text-left transition-colors hover:bg-accent w-full"
+      className="group flex flex-col rounded-lg border border-border p-4 text-left transition-all duration-200 active:scale-[0.97] hover:bg-accent w-full break-inside-avoid"
       style={{
         backgroundColor: `${note.color}26`,
         borderLeftWidth: 4,
@@ -237,6 +238,7 @@ export default function Notes() {
   };
 
   return (
+    <PageTransition>
     <div className="flex flex-col gap-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -290,25 +292,27 @@ export default function Notes() {
       ) : notes.length === 0 ? (
         <p className="text-muted-foreground">Nenhuma nota encontrada.</p>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
           {notes.map((note) => (
-            <SwipeableItem
-              key={note.id}
-              onSwipeRight={() => pinMutation.mutate({ id: note.id, pinned: note.pinned })}
-              onSwipeLeft={() => archiveMutation.mutate(note.id)}
-              rightIcon={Pin}
-              leftIcon={Archive}
-              rightBgColor="bg-primary"
-              leftBgColor="bg-destructive"
-            >
-              <NoteCard
-                note={note}
-                onClick={() => navigate(`/notes/${note.id}`)}
-              />
-            </SwipeableItem>
+            <div key={note.id} className="mb-4 break-inside-avoid">
+              <SwipeableItem
+                onSwipeRight={() => pinMutation.mutate({ id: note.id, pinned: note.pinned })}
+                onSwipeLeft={() => archiveMutation.mutate(note.id)}
+                rightIcon={Pin}
+                leftIcon={Archive}
+                rightBgColor="bg-primary"
+                leftBgColor="bg-destructive"
+              >
+                <NoteCard
+                  note={note}
+                  onClick={() => navigate(`/notes/${note.id}`)}
+                />
+              </SwipeableItem>
+            </div>
           ))}
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }
