@@ -3,6 +3,7 @@ import { RefreshCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageTransition } from "@/components/PageTransition";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -164,6 +165,7 @@ export default function Archive() {
   };
 
   return (
+    <PageTransition>
     <div className="max-w-3xl">
       <h1 className="text-2xl font-heading font-bold text-foreground mb-6">Arquivos</h1>
 
@@ -199,5 +201,6 @@ export default function Archive() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+    </PageTransition>
   );
 }

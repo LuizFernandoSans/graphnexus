@@ -212,6 +212,7 @@ export default function Tasks() {
   if (isLoading) return <p className="text-muted-foreground">Carregando...</p>;
 
   return (
+    <PageTransition>
     <div className="flex flex-col gap-6 h-full">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Tarefas</h1>
@@ -254,5 +255,6 @@ export default function Tasks() {
         </DragOverlay>
       </DndContext>
     </div>
+    </PageTransition>
   );
 }
