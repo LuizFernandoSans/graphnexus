@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import type { Project, ProjectStatus } from "@/types/entities";
+import { PageTransition } from "@/components/PageTransition";
 
 const STATUS_COLORS: Record<ProjectStatus, string> = {
   active: "#10B981",
@@ -120,7 +121,7 @@ function ProjectCard({ project, onClick }: { project: Project; onClick: () => vo
   return (
     <button
       onClick={onClick}
-      className="flex flex-col rounded-lg border border-border overflow-hidden text-left transition-colors hover:bg-accent"
+      className="flex flex-col rounded-lg border border-border overflow-hidden text-left transition-all duration-200 active:scale-[0.97] hover:bg-accent"
     >
       {/* Color header */}
       <div className="h-2" style={{ backgroundColor: project.cover_color || "#7C3AED" }} />
@@ -162,6 +163,7 @@ export default function Projects() {
   if (isLoading) return <p className="text-muted-foreground">Carregando...</p>;
 
   return (
+    <PageTransition>
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Projetos</h1>
@@ -181,5 +183,6 @@ export default function Projects() {
         </div>
       )}
     </div>
+    </PageTransition>
   );
 }
