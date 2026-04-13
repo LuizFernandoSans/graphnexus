@@ -61,11 +61,24 @@ export default function NoteDetail() {
     setHasUnsavedChanges(true);
   }, []);
 
+  // Auto-title helper
+  const deriveTitle = (currentTitle: string, htmlContent: string): string => {
+    if (currentTitle && currentTitle !== "Sem título") return currentTitle;
+    // Strip HTML tags to get plain text
+    const plain = htmlContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    if (!plain) return "Sem título";
+    const words = plain.split(" ").slice(0, 5).join(" ");
+    const derived = words.length > 30 ? words.slice(0, 30) : words;
+    return derived + (plain.length > derived.length ? "..." : "");
+  };
+
   // Save mutation
   const saveMutation = useMutation({
-    mutationFn: () =>
-      updateNote(id!, { title, emoji: emoji || null, content }),
-    onSuccess: () => {
+    mutationFn: () => {
+      const finalTitle = deriveTitle(title, content);
+      return updateNote(id!, { title: finalTitle, emoji: emoji || null, content });
+    },
+    onSuccess: (_, __, ctx) => {
       setHasUnsavedChanges(false);
       queryClient.invalidateQueries({ queryKey: ["note", id] });
       queryClient.invalidateQueries({ queryKey: ["notes"] });

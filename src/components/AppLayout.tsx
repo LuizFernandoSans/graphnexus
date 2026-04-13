@@ -5,11 +5,13 @@ import { AppSidebar } from "./AppSidebar";
 import { CommandPalette } from "./CommandPalette";
 import { QuickAdd } from "./QuickAdd";
 import { useTaskDueNotifications } from "@/hooks/useTaskDueNotifications";
+import { useAutoTriage } from "@/hooks/useAutoTriage";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { MobileSidebarContent } from "./MobileSidebarContent";
 
 export function AppLayout() {
   useTaskDueNotifications();
+  useAutoTriage();
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
