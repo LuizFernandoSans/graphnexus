@@ -155,7 +155,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="group flex flex-col rounded-lg border border-border p-4 text-left transition-all duration-200 active:scale-[0.97] hover:bg-accent w-full break-inside-avoid"
+      className="group flex flex-col h-full w-full rounded-lg border border-border p-4 text-left transition-all duration-200 active:scale-[0.97] hover:bg-accent"
       style={{
         backgroundColor: `${note.color}26`,
         borderLeftWidth: 4,
@@ -177,7 +177,7 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
 
       {note.content && (
         <p
-          className="mt-2 text-sm text-muted-foreground line-clamp-4"
+          className="mt-2 text-sm text-muted-foreground line-clamp-4 flex-1"
           dangerouslySetInnerHTML={{
             __html: note.content.replace(/<[^>]*>/g, " ").slice(0, 200),
           }}
@@ -292,9 +292,9 @@ export default function Notes() {
       ) : notes.length === 0 ? (
         <p className="text-muted-foreground">Nenhuma nota encontrada.</p>
       ) : (
-        <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 w-full">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 items-stretch">
           {notes.map((note) => (
-            <div key={note.id} className="break-inside-avoid inline-block w-full mb-4">
+            <div key={note.id}>
               <SwipeableItem
                 onSwipeRight={() => pinMutation.mutate({ id: note.id, pinned: note.pinned })}
                 onSwipeLeft={() => archiveMutation.mutate(note.id)}
