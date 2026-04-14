@@ -4,6 +4,7 @@ import { format, addDays as dfAddDays } from "date-fns";
 import { Check, CalendarPlus, SkipForward, Archive, Plus, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { parseTaskInput } from "@/lib/parseTaskInput";
 import { createTask, updateTask } from "@/lib/api/tasks";
 import { updateNote } from "@/lib/api/notes";
 import {
@@ -102,7 +103,15 @@ function StepDump({
   const [added, setAdded] = useState<string[]>([]);
 
   const createMut = useMutation({
-    mutationFn: (title: string) => createTask({ title, status: "todo" }),
+    mutationFn: (rawTitle: string) => {
+      const parsed = parseTaskInput(rawTitle);
+      return createTask({
+        title: parsed.title,
+        due_date: parsed.due_date,
+        status: parsed.status,
+        priority: parsed.priority,
+      });
+    },
     onSuccess: (_, title) => {
       setAdded((prev) => [...prev, title]);
       onChange("");
