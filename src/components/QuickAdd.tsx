@@ -46,7 +46,7 @@ export function QuickAdd({ externalOpen, onExternalOpenChange }: { externalOpen?
   });
 
   const taskMutation = useMutation({
-    mutationFn: (params: { title: string; due_date?: string | null; status?: string }) =>
+    mutationFn: (params: { title: string; due_date?: string | null; status?: string; priority?: string }) =>
       createTask(params),
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -73,6 +73,7 @@ export function QuickAdd({ externalOpen, onExternalOpenChange }: { externalOpen?
       title: parsed.title,
       due_date: parsed.due_date,
       status: parsed.status,
+      priority: parsed.priority,
     });
   };
 
@@ -103,7 +104,7 @@ export function QuickAdd({ externalOpen, onExternalOpenChange }: { externalOpen?
               autoFocus
             />
             <p className="text-xs text-muted-foreground">
-              Datas são detectadas automaticamente ✨
+              Datas, prioridade e status são detectados automaticamente ✨
             </p>
             <DialogFooter className="flex-row gap-2 sm:justify-end">
               <Button
