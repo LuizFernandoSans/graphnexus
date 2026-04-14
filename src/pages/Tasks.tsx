@@ -13,12 +13,13 @@ import {
   useDroppable,
   useDraggable,
 } from "@dnd-kit/core";
-import { Plus, GripVertical, Calendar, Flag, Repeat } from "lucide-react";
+import { Plus, GripVertical, Calendar, Flag, Repeat, ArrowLeftRight } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fetchTasks, updateTask, createTask } from "@/lib/api/tasks";
 import { useCompleteRecurringTask } from "@/hooks/useRecurrence";
 import { PageTransition } from "@/components/PageTransition";
+import { MoveTaskDrawer } from "@/components/tasks/MoveTaskDrawer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -49,10 +50,12 @@ function TaskCard({
   task,
   onClick,
   isDragging,
+  onMoveClick,
 }: {
   task: Task;
   onClick: () => void;
   isDragging?: boolean;
+  onMoveClick?: (e: React.MouseEvent) => void;
 }) {
   return (
     <div
@@ -61,7 +64,7 @@ function TaskCard({
         isDragging ? "opacity-50" : ""
       }`}
     >
-      <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
+      <GripVertical className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity cursor-grab hidden md:block" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{task.title}</p>
         <div className="flex items-center gap-2 mt-1.5 flex-wrap">
@@ -82,6 +85,19 @@ function TaskCard({
           )}
         </div>
       </div>
+      {/* Mobile-only move button */}
+      {onMoveClick && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onMoveClick(e);
+          }}
+          className="flex md:hidden items-center justify-center h-8 w-8 rounded-md text-muted-foreground hover:bg-accent shrink-0 self-center"
+          aria-label="Mover tarefa"
+        >
+          <ArrowLeftRight className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
@@ -150,7 +166,7 @@ function DroppableColumn({ id, children }: { id: string; children: React.ReactNo
   );
 }
 
-function DraggableTask({ task, onClick }: { task: Task; onClick: () => void }) {
+function DraggableTask({ task, onClick, onMoveClick }: { task: Task; onClick: () => void; onMoveClick: (e: React.MouseEvent) => void }) {
   const { attributes, listeners, setNodeRef, transform } = useDraggable({
     id: task.id,
   });
@@ -160,7 +176,7 @@ function DraggableTask({ task, onClick }: { task: Task; onClick: () => void }) {
 
   return (
     <div ref={setNodeRef} style={style} {...listeners} {...attributes}>
-      <TaskCard task={task} onClick={onClick} />
+      <TaskCard task={task} onClick={onClick} onMoveClick={onMoveClick} />
     </div>
   );
 }
@@ -170,6 +186,7 @@ export default function Tasks() {
   const queryClient = useQueryClient();
   const completeRecurring = useCompleteRecurringTask();
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [moveTask, setMoveTask] = useState<Task | null>(null);
 
   const { data: tasks = [], isLoading } = useQuery({
     queryKey: ["tasks"],
@@ -207,54 +224,74 @@ export default function Tasks() {
     }
   };
 
+  const handleMobileMove = (task: Task, newStatus: TaskStatus) => {
+    if (newStatus === "done") {
+      completeRecurring.mutate(task);
+    } else {
+      moveMutation.mutate({ taskId: task.id, newStatus });
+    }
+  };
+
   const tasksByStatus = (status: TaskStatus) => tasks.filter((t) => t.status === status);
 
   if (isLoading) return <p className="text-muted-foreground">Carregando...</p>;
 
   return (
     <PageTransition>
-    <div className="flex flex-col gap-6 h-full">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Tarefas</h1>
-        <NewTaskDialog />
-      </div>
-
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragStart={handleDragStart}
-        onDragEnd={handleDragEnd}
-      >
-        <div className="flex md:grid md:grid-cols-2 xl:grid-cols-4 gap-4 flex-1 overflow-x-auto snap-x snap-mandatory pb-4 md:overflow-x-visible md:pb-0">
-          {COLUMNS.map((col) => (
-            <DroppableColumn key={col.id} id={col.id}>
-              <div className="flex items-center gap-2 mb-3">
-                <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color }} />
-                <h2 className="text-sm font-semibold text-foreground">{col.label}</h2>
-                <span className="text-xs text-muted-foreground">({tasksByStatus(col.id).length})</span>
-              </div>
-              <div className="flex flex-col gap-2">
-                {tasksByStatus(col.id).map((task) => (
-                  <DraggableTask
-                    key={task.id}
-                    task={task}
-                    onClick={() => navigate(`/tasks/${task.id}`)}
-                  />
-                ))}
-              </div>
-            </DroppableColumn>
-          ))}
+      <div className="flex flex-col gap-6 h-full">
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold">Tarefas</h1>
+          <NewTaskDialog />
         </div>
 
-        <DragOverlay>
-          {activeTask && (
-            <div className="w-64">
-              <TaskCard task={activeTask} onClick={() => {}} isDragging />
-            </div>
-          )}
-        </DragOverlay>
-      </DndContext>
-    </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="flex md:grid md:grid-cols-2 xl:grid-cols-4 gap-4 flex-1 overflow-x-auto snap-x snap-mandatory pb-4 md:overflow-x-visible md:pb-0">
+            {COLUMNS.map((col) => (
+              <DroppableColumn key={col.id} id={col.id}>
+                <div className="flex items-center gap-2 mb-3">
+                  <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: col.color }} />
+                  <h2 className="text-sm font-semibold text-foreground">{col.label}</h2>
+                  <span className="text-xs text-muted-foreground">({tasksByStatus(col.id).length})</span>
+                </div>
+                <div className="flex flex-col gap-2">
+                  {tasksByStatus(col.id).map((task) => (
+                    <DraggableTask
+                      key={task.id}
+                      task={task}
+                      onClick={() => navigate(`/tasks/${task.id}`)}
+                      onMoveClick={() => setMoveTask(task)}
+                    />
+                  ))}
+                </div>
+              </DroppableColumn>
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeTask && (
+              <div className="w-64">
+                <TaskCard task={activeTask} onClick={() => {}} isDragging />
+              </div>
+            )}
+          </DragOverlay>
+        </DndContext>
+
+        {/* Mobile move drawer */}
+        <MoveTaskDrawer
+          open={!!moveTask}
+          onOpenChange={(open) => !open && setMoveTask(null)}
+          currentStatus={moveTask?.status as TaskStatus ?? "backlog"}
+          onMove={(newStatus) => {
+            if (moveTask) handleMobileMove(moveTask, newStatus);
+            setMoveTask(null);
+          }}
+        />
+      </div>
     </PageTransition>
   );
 }

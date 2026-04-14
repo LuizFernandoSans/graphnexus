@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Plus, StickyNote, CheckSquare, FolderKanban, Send } from "lucide-react";
@@ -16,16 +16,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
-export function QuickAdd() {
+export function QuickAdd({ externalOpen, onExternalOpenChange }: { externalOpen?: boolean; onExternalOpenChange?: (open: boolean) => void }) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [quickText, setQuickText] = useState("");
-  const [quickOpen, setQuickOpen] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+
+  // Sync with external open state (from hotkey)
+  const isDialogOpen = externalOpen ?? dialogOpen;
+  const setIsDialogOpen = useCallback((open: boolean) => {
+    setDialogOpen(open);
+    onExternalOpenChange?.(open);
+  }, [onExternalOpenChange]);
 
   const noteMutation = useMutation({
     mutationFn: () => createNote({ title: "Sem título" }),
@@ -42,6 +51,8 @@ export function QuickAdd() {
     onSuccess: (task) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       toast.success("Tarefa criada!");
+      setIsDialogOpen(false);
+      setQuickText("");
       navigate(`/tasks/${task.id}`);
     },
   });
@@ -63,41 +74,61 @@ export function QuickAdd() {
       due_date: parsed.due_date,
       status: parsed.status,
     });
-    setQuickText("");
-    setQuickOpen(false);
   };
 
   return (
     <div className="fixed bottom-6 right-6 z-[60] flex flex-col items-end gap-3">
-      {/* Quick task input */}
-      <Popover open={quickOpen} onOpenChange={setQuickOpen}>
-        <PopoverTrigger asChild>
-          <span className="sr-only">Quick task</span>
-        </PopoverTrigger>
-        <PopoverContent align="end" side="top" className="w-80 p-3">
+      {/* Quick Task Dialog - stable, won't close on accidental taps */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent
+          className="sm:max-w-md"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>Nova Tarefa Rápida</DialogTitle>
+          </DialogHeader>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleQuickTask();
             }}
-            className="flex gap-2"
+            className="flex flex-col gap-4"
           >
             <Input
               placeholder='Ex: "comprar pão amanhã"'
               value={quickText}
               onChange={(e) => setQuickText(e.target.value)}
-              className="flex-1 text-sm"
+              className="text-base min-h-[48px]"
               autoFocus
             />
-            <Button type="submit" size="icon" disabled={!quickText.trim() || taskMutation.isPending}>
-              <Send className="h-4 w-4" />
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              Datas são detectadas automaticamente ✨
+            </p>
+            <DialogFooter className="flex-row gap-2 sm:justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-[44px]"
+                onClick={() => {
+                  setIsDialogOpen(false);
+                  setQuickText("");
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="submit"
+                className="min-h-[44px] gap-2"
+                disabled={!quickText.trim() || taskMutation.isPending}
+              >
+                <Send className="h-4 w-4" />
+                {taskMutation.isPending ? "Criando..." : "Criar Tarefa"}
+              </Button>
+            </DialogFooter>
           </form>
-          <p className="text-[10px] text-muted-foreground mt-2">
-            Datas são detectadas automaticamente ✨
-          </p>
-        </PopoverContent>
-      </Popover>
+        </DialogContent>
+      </Dialog>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -109,11 +140,8 @@ export function QuickAdd() {
           <DropdownMenuItem onClick={() => noteMutation.mutate()} disabled={noteMutation.isPending}>
             <StickyNote className="mr-2 h-4 w-4" /> Nova Nota
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setQuickOpen(true)}>
+          <DropdownMenuItem onClick={() => setIsDialogOpen(true)}>
             <CheckSquare className="mr-2 h-4 w-4" /> Nova Tarefa Rápida
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => taskMutation.mutate({ title: "Nova tarefa" })} disabled={taskMutation.isPending}>
-            <CheckSquare className="mr-2 h-4 w-4" /> Nova Tarefa
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => projectMutation.mutate()} disabled={projectMutation.isPending}>
             <FolderKanban className="mr-2 h-4 w-4" /> Novo Projeto

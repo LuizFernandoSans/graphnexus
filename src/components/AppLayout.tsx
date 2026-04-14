@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { Menu, Network } from "lucide-react";
+import { useHotkeys } from "react-hotkeys-hook";
 import { AppSidebar } from "./AppSidebar";
 import { CommandPalette } from "./CommandPalette";
 import { QuickAdd } from "./QuickAdd";
@@ -13,6 +14,14 @@ export function AppLayout() {
   useTaskDueNotifications();
   useAutoTriage();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+
+  const openQuickAdd = useCallback(() => setQuickAddOpen(true), []);
+
+  useHotkeys("shift+n", (e) => {
+    e.preventDefault();
+    openQuickAdd();
+  }, { enableOnFormTags: false });
 
   return (
     <div className="flex min-h-screen w-full bg-background">
@@ -49,7 +58,7 @@ export function AppLayout() {
         <Outlet />
       </main>
       <CommandPalette />
-      <QuickAdd />
+      <QuickAdd externalOpen={quickAddOpen} onExternalOpenChange={setQuickAddOpen} />
     </div>
   );
 }
