@@ -57,6 +57,15 @@ export function QuickAdd({ externalOpen, onExternalOpenChange }: { externalOpen?
     },
   });
 
+  const projectMutation = useMutation({
+    mutationFn: () => createProject({ title: "Novo projeto" }),
+    onSuccess: (project) => {
+      queryClient.invalidateQueries({ queryKey: ["projects"] });
+      toast.success("Projeto criado!");
+      navigate(`/projects/${project.id}`);
+    },
+  });
+
   const handleQuickTask = () => {
     if (!quickText.trim()) return;
     const parsed = parseTaskInput(quickText);
