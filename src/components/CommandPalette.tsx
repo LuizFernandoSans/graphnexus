@@ -39,17 +39,29 @@ const TYPE_ROUTES: Record<EntityType, string> = {
 async function searchAll(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return [];
   const q = `%${escapeLikePattern(query)}%`;
-  const [notes, tasks, projects] = await Promise.all([
-    supabase.from("notes").select("id, title, emoji").or(`title.ilike.${q},content.ilike.${q}`).eq("archived", false).limit(5),
-    supabase.from("tasks").select("id, title").or(`title.ilike.${q},description.ilike.${q}`).eq("archived", false).limit(5),
-    supabase.from("projects").select("id, title, emoji").or(`title.ilike.${q},description.ilike.${q}`).eq("archived", false).limit(5),
+  
+  // Busca segura: duas queries por entidade (evita interpolação em .or())
+  // Notes: busca em title e content separadamente
+  const [notesTitle, notesContent, tasksTitle, tasksDesc, projectsTitle, projectsDesc] = await Promise.all([
+    supabase.from("notes").select("id, title, emoji").ilike("title", q).eq("archived", false).limit(5),
+    supabase.from("notes").select("id, title, emoji").ilike("content", q).eq("archived", false).limit(5),
+    supabase.from("tasks").select("id, title").ilike("title", q).eq("archived", false).limit(5),
+    supabase.from("tasks").select("id, title").ilike("description", q).eq("archived", false).limit(5),
+    supabase.from("projects").select("id, title, emoji").ilike("title", q).eq("archived", false).limit(5),
+    supabase.from("projects").select("id, title, emoji").ilike("description", q).eq("archived", false).limit(5),
   ]);
 
-  const results: SearchResult[] = [];
-  (notes.data || []).forEach((n) => results.push({ id: n.id, type: "note", title: n.title, emoji: n.emoji }));
-  (tasks.data || []).forEach((t) => results.push({ id: t.id, type: "task", title: t.title }));
-  (projects.data || []).forEach((p) => results.push({ id: p.id, type: "project", title: p.title, emoji: p.emoji }));
-  return results;
+  // Combinar resultados e remover duplicatas
+  const combined = new Map<string, SearchResult>();
+  
+  (notesTitle.data || []).forEach((n) => combined.set(n.id, { id: n.id, type: "note", title: n.title, emoji: n.emoji }));
+  (notesContent.data || []).forEach((n) => combined.set(n.id, { id: n.id, type: "note", title: n.title, emoji: n.emoji }));
+  (tasksTitle.data || []).forEach((t) => combined.set(t.id, { id: t.id, type: "task", title: t.title }));
+  (tasksDesc.data || []).forEach((t) => combined.set(t.id, { id: t.id, type: "task", title: t.title }));
+  (projectsTitle.data || []).forEach((p) => combined.set(p.id, { id: p.id, type: "project", title: p.title, emoji: p.emoji }));
+  (projectsDesc.data || []).forEach((p) => combined.set(p.id, { id: p.id, type: "project", title: p.title, emoji: p.emoji }));
+  
+  return Array.from(combined.values());
 }
 
 export function CommandPalette() {

@@ -6,6 +6,55 @@ export async function fetchNotes(opts: {
   tags?: string[];
   showArchived?: boolean;
 }) {
+  // Se há busca, usamos duas queries separadas e combinamos (100% seguro, sem interpolação)
+  if (opts.search && opts.search.trim()) {
+    const searchPattern = `%${opts.search}%`;
+    
+    // Query 1: Busca no título
+    let titleQuery = supabase
+      .from("notes")
+      .select("*")
+      .ilike("title", searchPattern);
+    
+    // Query 2: Busca no conteúdo
+    let contentQuery = supabase
+      .from("notes")
+      .select("*")
+      .ilike("content", searchPattern);
+    
+    // Aplicar filtros comuns
+    if (!opts.showArchived) {
+      titleQuery = titleQuery.eq("archived", false);
+      contentQuery = contentQuery.eq("archived", false);
+    }
+    
+    if (opts.tags && opts.tags.length > 0) {
+      titleQuery = titleQuery.contains("tags", opts.tags);
+      contentQuery = contentQuery.contains("tags", opts.tags);
+    }
+    
+    // Executar ambas as queries em paralelo
+    const [titleResult, contentResult] = await Promise.all([
+      titleQuery,
+      contentQuery
+    ]);
+    
+    if (titleResult.error) throw titleResult.error;
+    if (contentResult.error) throw contentResult.error;
+    
+    // Combinar resultados e remover duplicatas (por ID)
+    const combined = new Map<string, Note>();
+    (titleResult.data || []).forEach((note: Note) => combined.set(note.id, note));
+    (contentResult.data || []).forEach((note: Note) => combined.set(note.id, note));
+    
+    // Ordenar: pinned primeiro, depois updated_at
+    return Array.from(combined.values()).sort((a, b) => {
+      if (a.pinned !== b.pinned) return b.pinned ? 1 : -1;
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
+  }
+  
+  // Sem busca: query normal
   let query = supabase
     .from("notes")
     .select("*")
@@ -14,10 +63,6 @@ export async function fetchNotes(opts: {
 
   if (!opts.showArchived) {
     query = query.eq("archived", false);
-  }
-
-  if (opts.search) {
-    query = query.or(`title.ilike.%${opts.search}%,content.ilike.%${opts.search}%`);
   }
 
   if (opts.tags && opts.tags.length > 0) {

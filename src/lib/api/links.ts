@@ -2,12 +2,30 @@ import { supabase } from "@/integrations/supabase/client";
 import type { EntityLink, EntityType } from "@/types/entities";
 
 export async function fetchEntityLinks(entityId: string, entityType: EntityType): Promise<EntityLink[]> {
-  const { data, error } = await supabase
+  // Busca segura: duas queries separadas (evita interpolação em .or())
+  // Query 1: Entity como source
+  const { data: sourceData, error: sourceError } = await supabase
     .from("entity_links")
     .select("*")
-    .or(`and(source_id.eq.${entityId},source_type.eq.${entityType}),and(target_id.eq.${entityId},target_type.eq.${entityType})`);
-  if (error) throw error;
-  return data as EntityLink[];
+    .eq("source_id", entityId)
+    .eq("source_type", entityType);
+  
+  // Query 2: Entity como target
+  const { data: targetData, error: targetError } = await supabase
+    .from("entity_links")
+    .select("*")
+    .eq("target_id", entityId)
+    .eq("target_type", entityType);
+  
+  if (sourceError) throw sourceError;
+  if (targetError) throw targetError;
+  
+  // Combinar resultados
+  const combined = new Map<string, EntityLink>();
+  (sourceData || []).forEach((link) => combined.set(link.id, link));
+  (targetData || []).forEach((link) => combined.set(link.id, link));
+  
+  return Array.from(combined.values());
 }
 
 export async function createEntityLink(link: {

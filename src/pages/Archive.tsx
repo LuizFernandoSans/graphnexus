@@ -54,13 +54,34 @@ function useArchivedTasks() {
       const threeDaysAgo = new Date();
       threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
 
-      const { data, error } = await supabase
+      // Busca segura: duas queries separadas (evita interpolação em .or())
+      const threeDaysAgoISO = threeDaysAgo.toISOString();
+      
+      // Query 1: Tarefas arquivadas
+      const { data: archivedData, error: archivedError } = await supabase
         .from("tasks")
         .select("id, title")
-        .or(`archived.eq.true,and(status.eq.done,completed_at.lt.${threeDaysAgo.toISOString()})`)
+        .eq("archived", true)
         .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data as ArchivedItem[];
+      
+      // Query 2: Tarefas completadas há mais de 3 dias
+      const { data: oldCompletedData, error: oldCompletedError } = await supabase
+        .from("tasks")
+        .select("id, title")
+        .eq("status", "done")
+        .lt("completed_at", threeDaysAgoISO)
+        .eq("archived", false)
+        .order("updated_at", { ascending: false });
+      
+      if (archivedError) throw archivedError;
+      if (oldCompletedError) throw oldCompletedError;
+      
+      // Combinar resultados e remover duplicatas
+      const combined = new Map<string, ArchivedItem>();
+      (archivedData || []).forEach((t) => combined.set(t.id, t));
+      (oldCompletedData || []).forEach((t) => combined.set(t.id, t));
+      
+      return Array.from(combined.values());
     },
   });
 }
