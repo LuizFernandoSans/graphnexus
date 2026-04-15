@@ -1,9 +1,7 @@
-import { useState, useCallback, useEffect } from "react";
-import { useParams, useNavigate, useBlocker } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Pin, PinOff, Archive, ArchiveRestore, Trash2 } from "lucide-react";
-import { toast } from "sonner";
-import { fetchNote, updateNote, deleteNote } from "@/lib/api/notes";
+import { useNoteDetail } from "@/hooks/useNoteDetail";
 import { LinkPanel } from "@/components/LinkPanel";
 import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Button } from "@/components/ui/button";
@@ -20,111 +18,29 @@ import {
 export default function NoteDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const { data: note, isLoading } = useQuery({
-    queryKey: ["note", id],
-    queryFn: () => fetchNote(id!),
-    enabled: !!id,
-  });
+  const {
+    note,
+    isLoading,
+    title,
+    emoji,
+    content,
+    hasUnsavedChanges,
+    setTitle,
+    setEmoji,
+    setContent,
+    handleSave,
+    handlePin,
+    handleArchive,
+    handleDelete,
+    blocker,
+    saveMutation,
+    pinMutation,
+    archiveMutation,
+    deleteMutation,
+  } = useNoteDetail(id);
 
-  const [title, setTitle] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [content, setContent] = useState("");
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
-
-  // Populate form when note loads
-  useEffect(() => {
-    if (note && note.id === id && loadedId !== id) {
-      setTitle(note.title);
-      setEmoji(note.emoji || "");
-      setContent(note.content || "");
-      setLoadedId(id!);
-      setHasUnsavedChanges(false);
-    }
-  }, [note, loadedId, id]);
-
-  // Track unsaved changes
-  const handleTitleChange = useCallback((val: string) => {
-    setTitle(val);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const handleEmojiChange = useCallback((val: string) => {
-    setEmoji(val);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  const handleContentChange = useCallback((html: string) => {
-    setContent(html);
-    setHasUnsavedChanges(true);
-  }, []);
-
-  // Auto-title helper
-  const deriveTitle = (currentTitle: string, htmlContent: string): string => {
-    if (currentTitle && currentTitle !== "Sem título") return currentTitle;
-    const doc = new DOMParser().parseFromString(htmlContent, "text/html");
-    const plain = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
-    if (!plain) return "Sem título";
-    const words = plain.split(" ").slice(0, 5).join(" ");
-    const derived = words.length > 30 ? words.slice(0, 30) : words;
-    return derived + (plain.length > derived.length ? "..." : "");
-  };
-
-  // Save mutation
-  const saveMutation = useMutation({
-    mutationFn: () => {
-      const finalTitle = deriveTitle(title, content);
-      return updateNote(id!, { title: finalTitle, emoji: emoji || null, content });
-    },
-    onSuccess: () => {
-      setHasUnsavedChanges(false);
-      queryClient.invalidateQueries({ queryKey: ["note", id] });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success("Nota salva!");
-    },
-    onError: () => toast.error("Erro ao salvar"),
-  });
-
-  const handleSave = useCallback(() => {
-    saveMutation.mutate();
-  }, [saveMutation]);
-
-  // Pin / Archive mutations
-  const pinMutation = useMutation({
-    mutationFn: () => updateNote(id!, { pinned: !note?.pinned }),
-    onSuccess: (updatedNote) => {
-      queryClient.invalidateQueries({ queryKey: ["note", id] });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success(updatedNote.pinned ? "Nota fixada" : "Nota desafixada");
-    },
-    onError: () => toast.error("Erro ao atualizar"),
-  });
-
-  const archiveMutation = useMutation({
-    mutationFn: () => updateNote(id!, { archived: !note?.archived }),
-    onSuccess: (updatedNote) => {
-      queryClient.invalidateQueries({ queryKey: ["note", id] });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success(updatedNote.archived ? "Nota arquivada" : "Nota desarquivada");
-    },
-    onError: () => toast.error("Erro ao atualizar"),
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteNote(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success("Nota excluída");
-      navigate("/notes");
-    },
-    onError: () => toast.error("Erro ao excluir"),
-  });
-
-  // Block navigation when unsaved
-  const blocker = useBlocker(hasUnsavedChanges);
 
   // Ctrl+S
   useEffect(() => {
@@ -137,6 +53,8 @@ export default function NoteDetail() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [hasUnsavedChanges, handleSave]);
+
+  const proceedWithBlocker = () => blocker.proceed?.();
 
   if (isLoading || !note) {
     return <p className="text-muted-foreground">Carregando...</p>;
@@ -160,10 +78,10 @@ export default function NoteDetail() {
                 <Save className="mr-1 h-4 w-4" />
                 {saveMutation.isPending ? "Salvando..." : "Salvar"}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => pinMutation.mutate()} title={note.pinned ? "Desafixar" : "Fixar"}>
+              <Button variant="ghost" size="icon" onClick={handlePin} disabled={pinMutation.isPending} title={note.pinned ? "Desafixar" : "Fixar"}>
                 {note.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
               </Button>
-              <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate()} title={note.archived ? "Desarquivar" : "Arquivar"}>
+              <Button variant="ghost" size="icon" onClick={handleArchive} disabled={archiveMutation.isPending} title={note.archived ? "Desarquivar" : "Arquivar"}>
                 {note.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
               </Button>
               <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setDeleteOpen(true)}>
@@ -174,12 +92,12 @@ export default function NoteDetail() {
 
           {/* Title + Emoji */}
           <div className="flex items-center gap-3">
-            <Input value={emoji} onChange={(e) => handleEmojiChange(e.target.value)} placeholder="😀" className="w-14 text-center text-2xl bg-transparent border-border" maxLength={2} />
-            <Input value={title} onChange={(e) => handleTitleChange(e.target.value)} className="flex-1 text-xl font-heading font-bold bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0" placeholder="Título da nota" />
+            <Input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder="😀" className="w-14 text-center text-2xl bg-transparent border-border" maxLength={2} />
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} className="flex-1 text-xl font-heading font-bold bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0" placeholder="Título da nota" />
           </div>
 
           {/* Editor */}
-          <RichTextEditor content={content} onChange={handleContentChange} />
+          <RichTextEditor content={content} onChange={setContent} />
         </div>
 
         {/* Right sidebar - Links */}
@@ -197,7 +115,7 @@ export default function NoteDetail() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <Button variant="ghost" onClick={() => setDeleteOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>Excluir</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>Excluir</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -210,7 +128,7 @@ export default function NoteDetail() {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex gap-2 sm:justify-end">
             <Button variant="ghost" onClick={() => blocker.reset?.()}>voltar</Button>
-            <Button variant="secondary" onClick={() => { setHasUnsavedChanges(false); blocker.proceed?.(); }}>Não Salvar</Button>
+            <Button variant="secondary" onClick={proceedWithBlocker}>Não Salvar</Button>
             <Button onClick={async () => { await saveMutation.mutateAsync(); blocker.proceed?.(); }} disabled={saveMutation.isPending}>
               <Save className="mr-1 h-4 w-4" /> Salvar
             </Button>

@@ -144,17 +144,29 @@ export default function Graph() {
     [navigate]
   );
 
-  // Helper function to check if node matches search
+  // Pre-compute searchable text index for O(1) lookup during render
+  const searchIndex = useMemo(() => {
+    const index = new Map<string, string>();
+    if (!data?.nodes) return index;
+    
+    data.nodes.forEach((node) => {
+      const searchableText = [
+        node.label,
+        node.content,
+        node.description,
+      ].filter(Boolean).join(" ").toLowerCase();
+      index.set(node.id, searchableText);
+    });
+    return index;
+  }, [data?.nodes]);
+
+  // Helper function to check if node matches search (O(1) lookup)
   const nodeMatchesSearch = useCallback((node: GraphNode): boolean => {
     if (!graphSearch.trim()) return true;
     const term = graphSearch.toLowerCase();
-    const searchableText = [
-      node.label,
-      node.content,
-      node.description,
-    ].filter(Boolean).join(" ").toLowerCase();
+    const searchableText = searchIndex.get(node.id) || "";
     return searchableText.includes(term);
-  }, [graphSearch]);
+  }, [graphSearch, searchIndex]);
 
   const nodeCanvasObject = useCallback(
     (node: GraphNode, ctx: CanvasRenderingContext2D, globalScale: number) => {

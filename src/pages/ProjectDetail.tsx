@@ -1,12 +1,8 @@
-import { useState, useCallback, useEffect } from "react";
-import { useParams, useNavigate, useBlocker } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Save, Trash2, Archive, ArchiveRestore, FileOutput } from "lucide-react";
 import { format } from "date-fns";
-import { toast } from "sonner";
-import { fetchProject, updateProject, deleteProject } from "@/lib/api/projects";
-import { createNote } from "@/lib/api/notes";
-import { createEntityLink } from "@/lib/api/links";
+import { useProjectDetail } from "@/hooks/useProjectDetail";
 import { LinkPanel } from "@/components/LinkPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,124 +44,40 @@ const PROJECT_COLORS = ["#7C3AED", "#2563EB", "#059669", "#D97706", "#DC2626", "
 export default function ProjectDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
 
-  const { data: project, isLoading } = useQuery({
-    queryKey: ["project", id],
-    queryFn: () => fetchProject(id!),
-    enabled: !!id,
-  });
+  const {
+    project,
+    isLoading,
+    title,
+    emoji,
+    description,
+    status,
+    coverColor,
+    startDate,
+    targetDate,
+    hasUnsavedChanges,
+    setTitle,
+    setEmoji,
+    setDescription,
+    setStatus,
+    setCoverColor,
+    setStartDate,
+    setTargetDate,
+    handleSave,
+    handleDelete,
+    handleArchive,
+    handleExtract,
+    blocker,
+    saveMutation,
+    deleteMutation,
+    archiveMutation,
+    extractMutation,
+  } = useProjectDetail(id);
 
-  const [title, setTitle] = useState("");
-  const [emoji, setEmoji] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<ProjectStatus>("active");
-  const [coverColor, setCoverColor] = useState("#7C3AED");
-  const [startDate, setStartDate] = useState<Date | undefined>();
-  const [targetDate, setTargetDate] = useState<Date | undefined>();
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
 
-  useEffect(() => {
-    if (project && project.id === id && loadedId !== id) {
-      setTitle(project.title);
-      setEmoji(project.emoji || "");
-      setDescription(project.description || "");
-      setStatus(project.status);
-      setCoverColor(project.cover_color || "#7C3AED");
-      setStartDate(project.start_date ? new Date(project.start_date + "T00:00:00") : undefined);
-      setTargetDate(project.target_date ? new Date(project.target_date + "T00:00:00") : undefined);
-      setLoadedId(id!);
-      setHasUnsavedChanges(false);
-    }
-  }, [project, loadedId, id]);
-
-  const markChanged = useCallback(() => setHasUnsavedChanges(true), []);
-
-  const saveMutation = useMutation({
-    mutationFn: () =>
-      updateProject(id!, {
-        title,
-        emoji: emoji || null,
-        description: description || null,
-        status,
-        cover_color: coverColor,
-        start_date: startDate ? format(startDate, "yyyy-MM-dd") : null,
-        target_date: targetDate ? format(targetDate, "yyyy-MM-dd") : null,
-      }),
-    onSuccess: () => {
-      setHasUnsavedChanges(false);
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast.success("Projeto salvo!");
-    },
-    onError: () => toast.error("Erro ao salvar"),
-  });
-
-  const handleSave = useCallback(() => saveMutation.mutate(), [saveMutation]);
-
-  const archiveMutation = useMutation({
-    mutationFn: () => updateProject(id!, { archived: !project?.archived }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast.success(project?.archived ? "Projeto desarquivado" : "Projeto arquivado");
-    },
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: () => deleteProject(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      toast.success("Projeto excluído");
-      navigate("/projects");
-    },
-  });
-
-  // Mutação tripla: extrair descrição como nota
-  const extractMutation = useMutation({
-    mutationFn: async () => {
-      if (!description || !id || !project) throw new Error("Sem conteúdo para extrair");
-
-      // 1. Criar a nota
-      const note = await createNote({
-        title: `Ref: ${project?.title || 'Sem título'}`,
-        content: description,
-      });
-
-      // 2. Criar o link bidirecional
-      await createEntityLink({
-        source_type: "note",
-        source_id: note.id,
-        target_type: "project",
-        target_id: id,
-        label: "Extraído da descrição",
-      });
-
-      // 3. Limpar a descrição do projeto
-      await updateProject(id, { description: "" });
-
-      return note;
-    },
-    onSuccess: () => {
-      setExtractOpen(false);
-      setDescription("");
-      setHasUnsavedChanges(false);
-      queryClient.invalidateQueries({ queryKey: ["projects"] });
-      queryClient.invalidateQueries({ queryKey: ["project", id] });
-      queryClient.invalidateQueries({ queryKey: ["notes"] });
-      queryClient.invalidateQueries({ queryKey: ["links"] });
-      toast.success("Nota extraída e vinculada com sucesso!");
-    },
-    onError: (error) => {
-      toast.error(`Erro ao extrair: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
-    },
-  });
-
-  const blocker = useBlocker(hasUnsavedChanges);
-
+  // Ctrl+S
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
@@ -176,6 +88,9 @@ export default function ProjectDetail() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [hasUnsavedChanges, handleSave]);
+
+  const closeExtractDialog = () => setExtractOpen(false);
+  const proceedWithBlocker = () => blocker.proceed?.();
 
   if (isLoading || !project) return <p className="text-muted-foreground">Carregando...</p>;
 
@@ -199,7 +114,7 @@ export default function ProjectDetail() {
               <Save className="mr-1 h-4 w-4" />
               {saveMutation.isPending ? "Salvando..." : "Salvar"}
             </Button>
-            <Button variant="ghost" size="icon" onClick={() => archiveMutation.mutate()}>
+            <Button variant="ghost" size="icon" onClick={handleArchive} disabled={archiveMutation.isPending}>
               {project.archived ? <ArchiveRestore className="h-4 w-4" /> : <Archive className="h-4 w-4" />}
             </Button>
             <Button
@@ -217,14 +132,14 @@ export default function ProjectDetail() {
         <div className="flex items-center gap-3">
           <Input
             value={emoji}
-            onChange={(e) => { setEmoji(e.target.value); markChanged(); }}
+            onChange={(e) => setEmoji(e.target.value)}
             placeholder="🎯"
             className="w-14 text-center text-2xl bg-transparent border-border"
             maxLength={2}
           />
           <Input
             value={title}
-            onChange={(e) => { setTitle(e.target.value); markChanged(); }}
+            onChange={(e) => setTitle(e.target.value)}
             className="flex-1 text-xl font-heading font-bold bg-transparent border-none focus-visible:ring-0"
             placeholder="Nome do projeto"
           />
@@ -234,7 +149,7 @@ export default function ProjectDetail() {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <Label className="text-xs text-muted-foreground mb-1 block">Status</Label>
-            <Select value={status} onValueChange={(v) => { setStatus(v as ProjectStatus); markChanged(); }}>
+            <Select value={status} onValueChange={(v) => setStatus(v as ProjectStatus)}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 {STATUS_OPTIONS.map((o) => (
@@ -250,7 +165,7 @@ export default function ProjectDetail() {
                 <button
                   key={c}
                   type="button"
-                  onClick={() => { setCoverColor(c); markChanged(); }}
+                  onClick={() => setCoverColor(c)}
                   className={`h-7 w-7 rounded-full border-2 transition-transform ${
                     coverColor === c ? "scale-110 border-foreground" : "border-transparent"
                   }`}
@@ -272,7 +187,7 @@ export default function ProjectDetail() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={startDate} onSelect={(d) => { setStartDate(d); markChanged(); }} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={startDate} onSelect={setStartDate} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -285,7 +200,7 @@ export default function ProjectDetail() {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
-                <Calendar mode="single" selected={targetDate} onSelect={(d) => { setTargetDate(d); markChanged(); }} className="p-3 pointer-events-auto" />
+                <Calendar mode="single" selected={targetDate} onSelect={setTargetDate} className="p-3 pointer-events-auto" />
               </PopoverContent>
             </Popover>
           </div>
@@ -309,7 +224,7 @@ export default function ProjectDetail() {
           </div>
           <RichTextEditor
             content={description}
-            onChange={(html) => { setDescription(html); markChanged(); }}
+            onChange={setDescription}
           />
         </div>
       </div>
@@ -332,7 +247,10 @@ export default function ProjectDetail() {
             <Button variant="ghost" onClick={() => setExtractOpen(false)}>Cancelar</Button>
             <Button
               variant="default"
-              onClick={() => extractMutation.mutate()}
+              onClick={() => {
+                handleExtract();
+                closeExtractDialog();
+              }}
               disabled={extractMutation.isPending}
             >
               {extractMutation.isPending ? "Transformando..." : "Transformar"}
@@ -350,7 +268,7 @@ export default function ProjectDetail() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <Button variant="ghost" onClick={() => setDeleteOpen(false)}>Cancelar</Button>
-            <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>Excluir</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={deleteMutation.isPending}>Excluir</Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -363,7 +281,7 @@ export default function ProjectDetail() {
           </AlertDialogHeader>
           <AlertDialogFooter className="flex gap-2 sm:justify-end">
             <Button variant="ghost" onClick={() => blocker.reset?.()}>voltar</Button>
-            <Button variant="secondary" onClick={() => { setHasUnsavedChanges(false); blocker.proceed?.(); }}>Não Salvar</Button>
+            <Button variant="secondary" onClick={proceedWithBlocker}>Não Salvar</Button>
             <Button onClick={async () => { await saveMutation.mutateAsync(); blocker.proceed?.(); }} disabled={saveMutation.isPending}>
               <Save className="mr-1 h-4 w-4" /> Salvar
             </Button>
