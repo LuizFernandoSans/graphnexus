@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,20 +11,38 @@ export default function Signup() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { emailRedirectTo: window.location.origin },
-    });
-    setLoading(false);
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Conta criada! Verifique seu email para confirmar o cadastro.");
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { emailRedirectTo: window.location.origin },
+      });
+      
+      if (!isMounted.current) return;
+      
+      if (error) {
+        toast.error(error.message);
+        setLoading(false);
+      } else {
+        toast.success("Conta criada! Verifique seu email para confirmar o cadastro.");
+        setLoading(false);
+      }
+    } catch {
+      if (isMounted.current) {
+        toast.error("Erro inesperado ao criar conta");
+        setLoading(false);
+      }
     }
   };
 

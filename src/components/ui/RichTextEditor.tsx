@@ -6,6 +6,7 @@ import { TableRow } from "@tiptap/extension-table-row";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { Link } from "@tiptap/extension-link";
+import Image from "@tiptap/extension-image";
 import {
   Bold,
   Italic,
@@ -24,11 +25,15 @@ import {
   Minus,
   Columns,
   Rows,
+  Camera,
+  Paperclip,
+  Image as ImageIcon,
 } from "lucide-react";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
+import { uploadFile, isImageFile } from "@/lib/storage";
 
 interface RichTextEditorProps {
   content: string;
@@ -88,12 +93,21 @@ function InternalLinkPicker({ editor }: { editor: ReturnType<typeof useEditor> }
       ...(tasks.data || []).map((t) => ({ id: t.id, title: t.title, emoji: null, type: "task" as const })),
       ...(projects.data || []).map((p) => ({ id: p.id, title: p.title, emoji: p.emoji, type: "project" as const })),
     ];
-    setResults(items);
+    return items;
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(() => doSearch(search), 250);
-    return () => clearTimeout(timer);
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      const results = await doSearch(search);
+      if (!cancelled && results) {
+        setResults(results);
+      }
+    }, 250);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
   }, [search, doSearch]);
 
   const insertLink = (item: SearchResult) => {
@@ -167,6 +181,26 @@ function InternalLinkPicker({ editor }: { editor: ReturnType<typeof useEditor> }
 }
 
 export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<ReturnType<typeof useEditor>>(null);
+
+  const handleUpload = useCallback(async (file: File | null | undefined) => {
+    if (!file) return;
+
+    const url = await uploadFile(file);
+    const editor = editorRef.current;
+    if (!url || !editor) return;
+
+    if (isImageFile(file)) {
+      editor.chain().focus().setImage({ src: url, alt: file.name }).run();
+    } else {
+      // Para documentos, insere como link
+      const linkHtml = `<a href="${url}" target="_blank" rel="noopener noreferrer" class="editor-link">📎 ${file.name}</a>`;
+      editor.chain().focus().insertContent(linkHtml).run();
+    }
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -180,6 +214,10 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         autolink: true,
         HTMLAttributes: { class: "editor-link" },
       }),
+      Image.configure({
+        allowBase64: false,
+        HTMLAttributes: { class: "editor-image" },
+      }),
     ],
     content,
     onUpdate: ({ editor }) => {
@@ -191,6 +229,10 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
       },
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
 
   useEffect(() => {
     if (editor && content !== editor.getHTML()) {
@@ -294,6 +336,39 @@ export function RichTextEditor({ content, onChange }: RichTextEditorProps) {
         )}
 
         <InternalLinkPicker editor={editor} />
+
+        <div className="mx-1 h-5 w-px bg-border" />
+
+        {/* Botão Câmera/Foto */}
+        <label
+          title="Câmera/Foto"
+          className="rounded p-1.5 transition-colors text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+        >
+          <Camera className="h-4 w-4" />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => handleUpload(e.target.files?.[0])}
+          />
+        </label>
+
+        {/* Botão Anexar Doc */}
+        <label
+          title="Anexar documento (PDF, DOC, TXT)"
+          className="rounded p-1.5 transition-colors text-muted-foreground hover:bg-accent hover:text-foreground cursor-pointer"
+        >
+          <Paperclip className="h-4 w-4" />
+          <input
+            ref={docInputRef}
+            type="file"
+            accept=".pdf,.doc,.docx,.txt,image/*"
+            hidden
+            onChange={(e) => handleUpload(e.target.files?.[0])}
+          />
+        </label>
       </div>
 
       {/* Editor */}

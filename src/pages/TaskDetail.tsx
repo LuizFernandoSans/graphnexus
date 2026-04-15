@@ -1,16 +1,18 @@
 import { useState, useCallback, useEffect } from "react";
 import { useParams, useNavigate, useBlocker } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Save, Trash2, Check, Archive, SkipForward } from "lucide-react";
+import { ArrowLeft, Save, Trash2, Check, Archive, SkipForward, FileOutput } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { fetchTask, updateTask, deleteTask } from "@/lib/api/tasks";
+import { createNote } from "@/lib/api/notes";
+import { createEntityLink } from "@/lib/api/links";
 import { useCompleteRecurringTask, useSkipRecurringTask } from "@/hooks/useRecurrence";
 import { RecurrenceSelector } from "@/components/RecurrenceSelector";
 import { LinkPanel } from "@/components/LinkPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/RichTextEditor";
 import { Label } from "@/components/ui/label";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -76,6 +78,7 @@ export default function TaskDetail() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [extractOpen, setExtractOpen] = useState(false);
 
   useEffect(() => {
     if (task && task.id === id && loadedId !== id) {
@@ -135,6 +138,46 @@ export default function TaskDetail() {
       navigate("/tasks");
     },
     onError: () => toast.error("Erro ao arquivar"),
+  });
+
+  // Mutação tripla: extrair descrição como nota
+  const extractMutation = useMutation({
+    mutationFn: async () => {
+      if (!description || !id || !task) throw new Error("Sem conteúdo para extrair");
+
+      // 1. Criar a nota
+      const note = await createNote({
+        title: `Ref: ${task?.title || 'Sem título'}`,
+        content: description,
+      });
+
+      // 2. Criar o link bidirecional
+      await createEntityLink({
+        source_type: "note",
+        source_id: note.id,
+        target_type: "task",
+        target_id: id,
+        label: "Extraído da descrição",
+      });
+
+      // 3. Limpar a descrição da tarefa
+      await updateTask(id, { description: "" });
+
+      return note;
+    },
+    onSuccess: () => {
+      setExtractOpen(false);
+      setDescription("");
+      setHasUnsavedChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["task", id] });
+      queryClient.invalidateQueries({ queryKey: ["notes"] });
+      queryClient.invalidateQueries({ queryKey: ["links"] });
+      toast.success("Nota extraída e vinculada com sucesso!");
+    },
+    onError: (error) => {
+      toast.error(`Erro ao extrair: ${error instanceof Error ? error.message : "Erro desconhecido"}`);
+    },
   });
 
   const blocker = useBlocker(hasUnsavedChanges);
@@ -291,12 +334,23 @@ export default function TaskDetail() {
 
       {/* Description */}
       <div>
-        <Label className="text-xs text-muted-foreground mb-1 block">Descrição</Label>
-        <Textarea
-          value={description}
-          onChange={(e) => { setDescription(e.target.value); markChanged(); }}
-          placeholder="Detalhes da tarefa..."
-          rows={6}
+        <div className="flex items-center justify-between mb-1">
+          <Label className="text-xs text-muted-foreground">Descrição</Label>
+          {description && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setExtractOpen(true)}
+              className="h-6 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <FileOutput className="mr-1 h-3.5 w-3.5" />
+              Transformar em Nota
+            </Button>
+          )}
+        </div>
+        <RichTextEditor
+          content={description}
+          onChange={(html) => { setDescription(html); markChanged(); }}
         />
       </div>
       </div>
@@ -320,6 +374,28 @@ export default function TaskDetail() {
             <Button variant="ghost" onClick={() => setDeleteOpen(false)}>Cancelar</Button>
             <Button variant="destructive" onClick={() => deleteMutation.mutate()} disabled={deleteMutation.isPending}>
               Excluir
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Extract Dialog */}
+      <AlertDialog open={extractOpen} onOpenChange={setExtractOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Transformar Descrição em Nota?</AlertDialogTitle>
+            <AlertDialogDescription>
+              O conteúdo atual será removido desta descrição e movido para uma nova Nota independente. Ela será automaticamente vinculada a este item.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <Button variant="ghost" onClick={() => setExtractOpen(false)}>Cancelar</Button>
+            <Button
+              variant="default"
+              onClick={() => extractMutation.mutate()}
+              disabled={extractMutation.isPending}
+            >
+              {extractMutation.isPending ? "Transformando..." : "Transformar"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

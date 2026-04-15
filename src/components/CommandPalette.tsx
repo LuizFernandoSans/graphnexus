@@ -40,9 +40,9 @@ async function searchAll(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return [];
   const q = `%${escapeLikePattern(query)}%`;
   const [notes, tasks, projects] = await Promise.all([
-    supabase.from("notes").select("id, title, emoji").ilike("title", q).eq("archived", false).limit(5),
-    supabase.from("tasks").select("id, title").ilike("title", q).eq("archived", false).limit(5),
-    supabase.from("projects").select("id, title, emoji").ilike("title", q).eq("archived", false).limit(5),
+    supabase.from("notes").select("id, title, emoji").or(`title.ilike.${q},content.ilike.${q}`).eq("archived", false).limit(5),
+    supabase.from("tasks").select("id, title").or(`title.ilike.${q},description.ilike.${q}`).eq("archived", false).limit(5),
+    supabase.from("projects").select("id, title, emoji").or(`title.ilike.${q},description.ilike.${q}`).eq("archived", false).limit(5),
   ]);
 
   const results: SearchResult[] = [];

@@ -17,7 +17,7 @@ export async function fetchNotes(opts: {
   }
 
   if (opts.search) {
-    query = query.ilike("title", `%${opts.search}%`);
+    query = query.or(`title.ilike.%${opts.search}%,content.ilike.%${opts.search}%`);
   }
 
   if (opts.tags && opts.tags.length > 0) {
@@ -43,6 +43,7 @@ export async function createNote(note: {
   title: string;
   emoji?: string;
   color?: string;
+  content?: string;
   tags?: string[];
 }) {
   const { data, error } = await supabase
@@ -51,6 +52,7 @@ export async function createNote(note: {
       title: note.title,
       emoji: note.emoji || null,
       color: note.color || "#7C3AED",
+      content: note.content || null,
       tags: note.tags || [],
     })
     .select()

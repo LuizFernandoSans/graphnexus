@@ -146,7 +146,7 @@ export default function Archive() {
     },
   });
 
-  const renderList = (items: ArchivedItem[] | undefined, isLoading: boolean, table: "notes" | "projects" | "tasks") => {
+  const renderList = (items: ArchivedItem[] | undefined, isLoading: boolean | undefined, table: "notes" | "projects" | "tasks") => {
     if (isLoading) return <p className="text-sm text-muted-foreground py-4">Carregando...</p>;
     if (!items?.length) return <p className="text-sm text-muted-foreground py-4">Nenhum item arquivado.</p>;
     return (
@@ -175,9 +175,9 @@ export default function Archive() {
           <TabsTrigger value="projects">Projetos</TabsTrigger>
           <TabsTrigger value="tasks">Tarefas</TabsTrigger>
         </TabsList>
-        <TabsContent value="notes">{renderList(notes.data, notes.isLoading, "notes")}</TabsContent>
-        <TabsContent value="projects">{renderList(projects.data, projects.isLoading, "projects")}</TabsContent>
-        <TabsContent value="tasks">{renderList(tasks.data, tasks.isLoading, "tasks")}</TabsContent>
+        <TabsContent value="notes">{renderList(notes?.data, notes?.isLoading, "notes")}</TabsContent>
+        <TabsContent value="projects">{renderList(projects?.data, projects?.isLoading, "projects")}</TabsContent>
+        <TabsContent value="tasks">{renderList(tasks?.data, tasks?.isLoading, "tasks")}</TabsContent>
       </Tabs>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
