@@ -82,20 +82,20 @@ export async function createTask(task: {
 
 export async function updateTask(
   id: string,
-  updates: Record<string, unknown>
+  updates: Partial<Pick<Task, "title" | "description" | "status" | "priority" | "due_date" | "completed_at" | "estimated_minutes" | "subtasks" | "archived" | "recurrence_rule" | "recurrence_end_date" | "recurrence_days">>
 ) {
   const payload: TaskUpdate = {};
-  if (updates.title !== undefined) payload.title = updates.title as string;
-  if (updates.description !== undefined) payload.description = updates.description as string | null;
-  if (updates.status !== undefined) payload.status = updates.status as string;
-  if (updates.priority !== undefined) payload.priority = updates.priority as string;
-  if (updates.due_date !== undefined) payload.due_date = updates.due_date as string | null;
-  if (updates.completed_at !== undefined) payload.completed_at = updates.completed_at as string | null;
-  if (updates.estimated_minutes !== undefined) payload.estimated_minutes = updates.estimated_minutes as number | null;
+  if (updates.title !== undefined) payload.title = updates.title;
+  if (updates.description !== undefined) payload.description = updates.description;
+  if (updates.status !== undefined) payload.status = updates.status;
+  if (updates.priority !== undefined) payload.priority = updates.priority;
+  if (updates.due_date !== undefined) payload.due_date = updates.due_date;
+  if (updates.completed_at !== undefined) payload.completed_at = updates.completed_at;
+  if (updates.estimated_minutes !== undefined) payload.estimated_minutes = updates.estimated_minutes;
   if (updates.subtasks !== undefined) payload.subtasks = updates.subtasks as Json;
-  if (updates.archived !== undefined) payload.archived = updates.archived as boolean;
-  if (updates.recurrence_rule !== undefined) payload.recurrence_rule = updates.recurrence_rule as string | null;
-  if (updates.recurrence_end_date !== undefined) payload.recurrence_end_date = updates.recurrence_end_date as string | null;
+  if (updates.archived !== undefined) payload.archived = updates.archived;
+  if (updates.recurrence_rule !== undefined) payload.recurrence_rule = updates.recurrence_rule;
+  if (updates.recurrence_end_date !== undefined) payload.recurrence_end_date = updates.recurrence_end_date;
   if (updates.recurrence_days !== undefined) (payload as Record<string, unknown>).recurrence_days = updates.recurrence_days;
 
   const { data, error } = await supabase

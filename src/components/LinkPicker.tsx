@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { EntityType } from "@/types/entities";
+import { useDebouncedValue, escapeLikePattern } from "@/lib/utils";
 
 interface SearchResult {
   id: string;
@@ -19,7 +20,7 @@ interface SearchResult {
 }
 
 async function searchEntities(query: string): Promise<SearchResult[]> {
-  const q = `%${query}%`;
+  const q = `%${escapeLikePattern(query)}%`;
   const [notes, tasks, projects] = await Promise.all([
     supabase.from("notes").select("id, title, emoji").ilike("title", q).limit(5),
     supabase.from("tasks").select("id, title").ilike("title", q).limit(5),
@@ -55,10 +56,12 @@ interface LinkPickerProps {
 export function LinkPicker({ open, onOpenChange, excludeId, onSelect }: LinkPickerProps) {
   const [search, setSearch] = useState("");
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const { data: results = [] } = useQuery({
-    queryKey: ["link-search", search],
-    queryFn: () => searchEntities(search),
-    enabled: open && search.length > 0,
+    queryKey: ["link-search", debouncedSearch],
+    queryFn: () => searchEntities(debouncedSearch),
+    enabled: open && debouncedSearch.length > 0,
   });
 
   const filtered = results.filter((r) => r.id !== excludeId);

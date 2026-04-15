@@ -19,6 +19,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import type { Note } from "@/types/entities";
+import { useDebouncedValue, escapeLikePattern } from "@/lib/utils";
 
 const NOTE_COLORS = [
   "#7C3AED",
@@ -27,8 +28,8 @@ const NOTE_COLORS = [
   "#D97706",
   "#DC2626",
   "#DB2777",
-  "#7C3AED",
   "#4F46E5",
+  "#0EA5E9",
 ];
 
 function NewNoteDialog({ onCreated }: { onCreated: () => void }) {
@@ -176,12 +177,12 @@ function NoteCard({ note, onClick }: { note: Note; onClick: () => void }) {
       </div>
 
       {note.content && (
-        <p
-          className="mt-2 text-sm text-muted-foreground line-clamp-4 flex-1"
-          dangerouslySetInnerHTML={{
-            __html: note.content.replace(/<[^>]*>/g, " ").slice(0, 200),
-          }}
-        />
+        <p className="mt-2 text-sm text-muted-foreground line-clamp-4 flex-1">
+          {(() => {
+            const doc = new DOMParser().parseFromString(note.content, "text/html");
+            return (doc.body.textContent || "").slice(0, 200);
+          })()}
+        </p>
       )}
 
       {note.tags && note.tags.length > 0 && (
@@ -204,9 +205,11 @@ export default function Notes() {
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showArchived, setShowArchived] = useState(false);
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const { data: notes = [], isLoading } = useQuery({
-    queryKey: ["notes", search, selectedTags, showArchived],
-    queryFn: () => fetchNotes({ search, tags: selectedTags, showArchived }),
+    queryKey: ["notes", debouncedSearch, selectedTags, showArchived],
+    queryFn: () => fetchNotes({ search: escapeLikePattern(debouncedSearch), tags: selectedTags, showArchived }),
   });
 
   const { data: allTags = [] } = useQuery({

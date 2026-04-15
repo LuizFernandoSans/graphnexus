@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { EntityType } from "@/types/entities";
+import { useDebouncedValue, escapeLikePattern } from "@/lib/utils";
 
 interface SearchResult {
   id: string;
@@ -37,7 +38,7 @@ const TYPE_ROUTES: Record<EntityType, string> = {
 
 async function searchAll(query: string): Promise<SearchResult[]> {
   if (!query.trim()) return [];
-  const q = `%${query}%`;
+  const q = `%${escapeLikePattern(query)}%`;
   const [notes, tasks, projects] = await Promise.all([
     supabase.from("notes").select("id, title, emoji").ilike("title", q).eq("archived", false).limit(5),
     supabase.from("tasks").select("id, title").ilike("title", q).eq("archived", false).limit(5),
@@ -56,10 +57,12 @@ export function CommandPalette() {
   const [search, setSearch] = useState("");
   const navigate = useNavigate();
 
+  const debouncedSearch = useDebouncedValue(search);
+
   const { data: results = [] } = useQuery({
-    queryKey: ["cmd-search", search],
-    queryFn: () => searchAll(search),
-    enabled: open && search.length > 0,
+    queryKey: ["cmd-search", debouncedSearch],
+    queryFn: () => searchAll(debouncedSearch),
+    enabled: open && debouncedSearch.length > 0,
   });
 
   // Keyboard shortcut

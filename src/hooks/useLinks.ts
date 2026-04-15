@@ -24,6 +24,7 @@ export function useCreateLink(entityId: string, entityType: EntityType) {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entity-links", entityId, entityType] });
+      queryClient.invalidateQueries({ queryKey: ["graph-data"] });
       toast.success("Link criado!");
     },
     onError: () => toast.error("Erro ao criar link (já existe?)"),
@@ -36,6 +37,7 @@ export function useDeleteLink(entityId: string, entityType: EntityType) {
     mutationFn: (linkId: string) => deleteEntityLink(linkId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["entity-links", entityId, entityType] });
+      queryClient.invalidateQueries({ queryKey: ["graph-data"] });
       toast.success("Link removido");
     },
     onError: () => toast.error("Erro ao remover link"),

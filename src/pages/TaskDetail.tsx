@@ -74,11 +74,11 @@ export default function TaskDetail() {
   const [recurrenceDays, setRecurrenceDays] = useState<number[] | null>(null);
   const [estimatedMinutes, setEstimatedMinutes] = useState<string>("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
-    if (task && !loaded) {
+    if (task && task.id === id && loadedId !== id) {
       setTitle(task.title);
       setDescription(task.description || "");
       setStatus(task.status);
@@ -87,9 +87,10 @@ export default function TaskDetail() {
       setRecurrenceRule(task.recurrence_rule);
       setRecurrenceDays(task.recurrence_days);
       setEstimatedMinutes(task.estimated_minutes?.toString() || "");
-      setLoaded(true);
+      setLoadedId(id!);
+      setHasUnsavedChanges(false);
     }
-  }, [task, loaded]);
+  }, [task, loadedId, id]);
 
   const markChanged = useCallback(() => setHasUnsavedChanges(true), []);
 
@@ -123,6 +124,17 @@ export default function TaskDetail() {
       toast.success("Tarefa excluída");
       navigate("/tasks");
     },
+  });
+
+  const archiveTaskMutation = useMutation({
+    mutationFn: () => updateTask(id!, { archived: true }),
+    onSuccess: () => {
+      setHasUnsavedChanges(false);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      toast.success("Tarefa arquivada");
+      navigate("/tasks");
+    },
+    onError: () => toast.error("Erro ao arquivar"),
   });
 
   const blocker = useBlocker(hasUnsavedChanges);
@@ -181,13 +193,8 @@ export default function TaskDetail() {
             variant="ghost"
             size="icon"
             title="Arquivar"
-            onClick={async () => {
-              setHasUnsavedChanges(false);
-              await updateTask(id!, { archived: true });
-              queryClient.invalidateQueries({ queryKey: ["tasks"] });
-              toast.success("Tarefa arquivada");
-              navigate("/tasks");
-            }}
+            onClick={() => archiveTaskMutation.mutate()}
+            disabled={archiveTaskMutation.isPending}
           >
             <Archive className="h-4 w-4" />
           </Button>

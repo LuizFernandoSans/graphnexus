@@ -62,11 +62,11 @@ export default function ProjectDetail() {
   const [startDate, setStartDate] = useState<Date | undefined>();
   const [targetDate, setTargetDate] = useState<Date | undefined>();
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   useEffect(() => {
-    if (project && !loaded) {
+    if (project && project.id === id && loadedId !== id) {
       setTitle(project.title);
       setEmoji(project.emoji || "");
       setDescription(project.description || "");
@@ -74,9 +74,10 @@ export default function ProjectDetail() {
       setCoverColor(project.cover_color || "#7C3AED");
       setStartDate(project.start_date ? new Date(project.start_date + "T00:00:00") : undefined);
       setTargetDate(project.target_date ? new Date(project.target_date + "T00:00:00") : undefined);
-      setLoaded(true);
+      setLoadedId(id!);
+      setHasUnsavedChanges(false);
     }
-  }, [project, loaded]);
+  }, [project, loadedId, id]);
 
   const markChanged = useCallback(() => setHasUnsavedChanges(true), []);
 

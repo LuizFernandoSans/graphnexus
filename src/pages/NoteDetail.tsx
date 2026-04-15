@@ -32,18 +32,19 @@ export default function NoteDetail() {
   const [emoji, setEmoji] = useState("");
   const [content, setContent] = useState("");
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedId, setLoadedId] = useState<string | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
   // Populate form when note loads
   useEffect(() => {
-    if (note && !loaded) {
+    if (note && note.id === id && loadedId !== id) {
       setTitle(note.title);
       setEmoji(note.emoji || "");
       setContent(note.content || "");
-      setLoaded(true);
+      setLoadedId(id!);
+      setHasUnsavedChanges(false);
     }
-  }, [note, loaded]);
+  }, [note, loadedId, id]);
 
   // Track unsaved changes
   const handleTitleChange = useCallback((val: string) => {
@@ -64,8 +65,8 @@ export default function NoteDetail() {
   // Auto-title helper
   const deriveTitle = (currentTitle: string, htmlContent: string): string => {
     if (currentTitle && currentTitle !== "Sem título") return currentTitle;
-    // Strip HTML tags to get plain text
-    const plain = htmlContent.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const doc = new DOMParser().parseFromString(htmlContent, "text/html");
+    const plain = (doc.body.textContent || "").replace(/\s+/g, " ").trim();
     if (!plain) return "Sem título";
     const words = plain.split(" ").slice(0, 5).join(" ");
     const derived = words.length > 30 ? words.slice(0, 30) : words;
@@ -78,7 +79,7 @@ export default function NoteDetail() {
       const finalTitle = deriveTitle(title, content);
       return updateNote(id!, { title: finalTitle, emoji: emoji || null, content });
     },
-    onSuccess: (_, __, ctx) => {
+    onSuccess: () => {
       setHasUnsavedChanges(false);
       queryClient.invalidateQueries({ queryKey: ["note", id] });
       queryClient.invalidateQueries({ queryKey: ["notes"] });
@@ -94,20 +95,22 @@ export default function NoteDetail() {
   // Pin / Archive mutations
   const pinMutation = useMutation({
     mutationFn: () => updateNote(id!, { pinned: !note?.pinned }),
-    onSuccess: () => {
+    onSuccess: (updatedNote) => {
       queryClient.invalidateQueries({ queryKey: ["note", id] });
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success(note?.pinned ? "Nota desafixada" : "Nota fixada");
+      toast.success(updatedNote.pinned ? "Nota fixada" : "Nota desafixada");
     },
+    onError: () => toast.error("Erro ao atualizar"),
   });
 
   const archiveMutation = useMutation({
     mutationFn: () => updateNote(id!, { archived: !note?.archived }),
-    onSuccess: () => {
+    onSuccess: (updatedNote) => {
       queryClient.invalidateQueries({ queryKey: ["note", id] });
       queryClient.invalidateQueries({ queryKey: ["notes"] });
-      toast.success(note?.archived ? "Nota desarquivada" : "Nota arquivada");
+      toast.success(updatedNote.archived ? "Nota arquivada" : "Nota desarquivada");
     },
+    onError: () => toast.error("Erro ao atualizar"),
   });
 
   const deleteMutation = useMutation({

@@ -159,7 +159,6 @@ export default function Graph() {
       ctx.font = `${fontSize}px "DM Sans", sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      ctx.fillStyle = node.isOrphan ? ORPHAN_TEXT_COLOR : "#F4F4F8";
       ctx.globalAlpha = 1;
       ctx.fillStyle = node.isOrphan ? ORPHAN_TEXT_COLOR : "#F4F4F8";
       ctx.fillText(truncated, x, y + r + 3 / globalScale);
